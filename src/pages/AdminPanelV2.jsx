@@ -3,6 +3,7 @@ import axios from "axios";
 
 import PixwikLogo from "@/assets/pixwik-logo.svg";
 import { useToast } from "@/hooks/use-toast";
+import { API, getAxiosConfig, extractErrorMessage } from "@/config/api";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,26 +23,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-
-
-const BACKEND_URL = "https://careersbackend.pixwik.com";
-console.log(BACKEND_URL,"=================>BACKEND_URL");
-
-const API = `${BACKEND_URL}/api`;
-
-console.log(API,"===================>API");
-
-
-// Helper function to add ngrok bypass header to axios config
-function getAxiosConfig(config = {}) {
-  return {
-    ...config,
-    headers: {
-      'ngrok-skip-browser-warning': 'true',
-      ...(config.headers || {})
-    }
-  };
-}
 
 function formatDateTime(iso) {
   try {
@@ -72,43 +53,6 @@ function slugify(s) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 120);
-}
-
-function extractErrorMessage(error, fallback = "An error occurred") {
-  if (!error) return fallback;
-  
-  // If it's already a string, return it
-  if (typeof error === "string") return error;
-  
-  // If it's an object with a detail property
-  if (error?.response?.data?.detail) {
-    const detail = error.response.data.detail;
-    if (typeof detail === "string") return detail;
-    if (Array.isArray(detail)) {
-      // Handle array of validation errors
-      return detail.map((err) => {
-        if (typeof err === "string") return err;
-        if (err?.msg) return err.msg;
-        return JSON.stringify(err);
-      }).join(", ");
-    }
-    if (typeof detail === "object") {
-      // Handle validation error object
-      if (detail.msg) return detail.msg;
-      if (detail.message) return detail.message;
-      return JSON.stringify(detail);
-    }
-  }
-  
-  // If it's an object with a message property
-  if (error?.message) return error.message;
-  
-  // Last resort: stringify the error
-  try {
-    return JSON.stringify(error);
-  } catch {
-    return fallback;
-  }
 }
 
 function BulkActionsMenu({ count, onReject, onSelect, onNotSelected, onDelete }) {
@@ -269,7 +213,7 @@ export default function AdminPanelV2() {
 
       setLoginState({ status: "idle", error: null });
     } catch (e) {
-      const msg = e?.response?.data?.detail || "Login failed";
+      const msg = extractErrorMessage(e, "Login failed");
       setLoginState({ status: "error", error: msg });
     }
   }
@@ -280,7 +224,7 @@ export default function AdminPanelV2() {
       const res = await axios.get(`${API}/admin/jobs`, getAxiosConfig({ headers: { Authorization: `Bearer ${token}` } }));
       setJobsState((s) => ({ ...s, status: "idle", rows: res.data.items || [], error: null }));
     } catch (e) {
-      const msg = e?.response?.data?.detail || "Failed to load jobs";
+      const msg = extractErrorMessage(e, "Failed to load jobs");
       setJobsState((s) => ({ ...s, status: "error", error: msg }));
     }
   }
@@ -344,7 +288,7 @@ export default function AdminPanelV2() {
       selectJob(res.data);
       setJobsState((s) => ({ ...s, status: "idle", error: null }));
     } catch (e) {
-      const msg = e?.response?.data?.detail || "Failed to create job";
+      const msg = extractErrorMessage(e, "Failed to create job");
       setJobsState((s) => ({ ...s, status: "error", error: msg }));
     }
   }
@@ -380,7 +324,7 @@ export default function AdminPanelV2() {
       selectJob(res.data);
       setJobsState((s) => ({ ...s, status: "idle", error: null }));
     } catch (e) {
-      const msg = e?.response?.data?.detail || "Failed to update job";
+      const msg = extractErrorMessage(e, "Failed to update job");
       setJobsState((s) => ({ ...s, status: "error", error: msg }));
     }
   }
@@ -397,7 +341,7 @@ export default function AdminPanelV2() {
       newJobDraft();
       setJobsState((s) => ({ ...s, status: "idle", error: null }));
     } catch (e) {
-      const msg = e?.response?.data?.detail || "Failed to delete job";
+      const msg = extractErrorMessage(e, "Failed to delete job");
       setJobsState((s) => ({ ...s, status: "error", error: msg }));
     }
   }
@@ -473,7 +417,7 @@ export default function AdminPanelV2() {
       const res = await axios.get(`${API}/admin/candidates/${candidateId}/scores`, getAxiosConfig({ headers: { Authorization: `Bearer ${token}` } }));
       setScoresState((s) => ({ ...s, status: "idle", error: null, rows: res.data.items || [] }));
     } catch (e) {
-      const msg = e?.response?.data?.detail || "Failed to load evaluation history";
+      const msg = extractErrorMessage(e, "Failed to load evaluation history");
       setScoresState((s) => ({ ...s, status: "error", error: msg }));
     }
   }
@@ -497,7 +441,7 @@ export default function AdminPanelV2() {
       setCandidatesState((s) => ({ ...s, status: "idle", rows, error: null }));
       setSelectedCandidateIds((prev) => prev.filter((id) => (res.data.items || []).some((c) => c.candidate_id === id)));
     } catch (e) {
-      const msg = e?.response?.data?.detail || "Failed to load candidates";
+      const msg = extractErrorMessage(e, "Failed to load candidates");
       setCandidatesState((s) => ({ ...s, status: "error", error: msg }));
     }
   }
@@ -508,7 +452,7 @@ export default function AdminPanelV2() {
       const res = await axios.get(`${API}/admin/rounds`, getAxiosConfig({ headers: { Authorization: `Bearer ${token}` } }));
       setRoundsState((s) => ({ ...s, status: "idle", rows: res.data.items || [], error: null }));
     } catch (e) {
-      const msg = e?.response?.data?.detail || "Failed to load rounds";
+      const msg = extractErrorMessage(e, "Failed to load rounds");
       setRoundsState((s) => ({ ...s, status: "error", error: msg }));
     }
   }
@@ -538,7 +482,7 @@ export default function AdminPanelV2() {
       await loadCandidates();
       toast({ title: "Score saved", description: `${candidate.full_name} – ${candidate.current_round} – ${Number(evalForm.score)} pts` });
     } catch (e) {
-      const msg = e?.response?.data?.detail || "Failed to submit score";
+      const msg = extractErrorMessage(e, "Failed to submit score");
       setCandidatesState((s) => ({ ...s, error: msg }));
     }
   }
@@ -553,7 +497,7 @@ export default function AdminPanelV2() {
       setCandidatesState((s) => ({ ...s, selected: null }));
       setSelectedCandidateIds((prev) => prev.filter((id) => id !== candidate.candidate_id));
     } catch (e) {
-      const msg = e?.response?.data?.detail || "Failed to promote";
+      const msg = extractErrorMessage(e, "Failed to promote");
       setCandidatesState((s) => ({ ...s, error: msg }));
     }
   }
@@ -594,7 +538,7 @@ export default function AdminPanelV2() {
     } catch (e) {
       // Restore selection on failure
       setSelectedCandidateIds(ids);
-      const msg = e?.response?.data?.detail || "Failed to bulk promote";
+      const msg = extractErrorMessage(e, "Failed to bulk promote");
       setCandidatesState((s) => ({ ...s, error: msg }));
     }
   }
@@ -619,7 +563,7 @@ export default function AdminPanelV2() {
       toast({ title: "Candidates deleted", description: `${ids.length} candidate(s) deleted` });
     } catch (e) {
       setSelectedCandidateIds(ids);
-      const msg = e?.response?.data?.detail || "Failed to delete candidates";
+      const msg = extractErrorMessage(e, "Failed to delete candidates");
       setCandidatesState((s) => ({ ...s, error: msg }));
     }
   }
@@ -644,7 +588,7 @@ export default function AdminPanelV2() {
       toast({ title: "Candidates rejected", description: `${ids.length} candidate(s) rejected` });
     } catch (e) {
       setSelectedCandidateIds(ids);
-      const msg = e?.response?.data?.detail || "Failed to bulk reject";
+      const msg = extractErrorMessage(e, "Failed to bulk reject");
       setCandidatesState((s) => ({ ...s, error: msg }));
     }
   }
@@ -670,7 +614,7 @@ export default function AdminPanelV2() {
       toast({ title: "Candidates updated", description: `${ids.length} candidate(s) updated` });
     } catch (e) {
       setSelectedCandidateIds(ids);
-      const msg = e?.response?.data?.detail || "Failed to bulk finalize";
+      const msg = extractErrorMessage(e, "Failed to bulk finalize");
       setCandidatesState((s) => ({ ...s, error: msg }));
     }
   }
@@ -690,7 +634,7 @@ export default function AdminPanelV2() {
       setCandidatesState((s) => ({ ...s, selected: null }));
       setSelectedCandidateIds((prev) => prev.filter((id) => id !== candidate.candidate_id));
     } catch (e) {
-      const msg = e?.response?.data?.detail || "Failed to update candidate";
+      const msg = extractErrorMessage(e, "Failed to update candidate");
       setCandidatesState((s) => ({ ...s, error: msg }));
     }
   }
@@ -705,7 +649,7 @@ export default function AdminPanelV2() {
       await axios.post(`${API}/admin/candidates/${candidate.candidate_id}/reject`, {}, getAxiosConfig({ headers: { Authorization: `Bearer ${token}` } }));
       await loadCandidates();
     } catch (e) {
-      const msg = e?.response?.data?.detail || "Failed to reject";
+      const msg = extractErrorMessage(e, "Failed to reject");
       setCandidatesState((s) => ({ ...s, error: msg }));
     }
   }
@@ -719,7 +663,7 @@ export default function AdminPanelV2() {
       }));
       setQuizState((s) => ({ ...s, status: "idle", items: res.data.items || [], error: null }));
     } catch (e) {
-      const msg = e?.response?.data?.detail || "Failed to load quiz questions";
+      const msg = extractErrorMessage(e, "Failed to load quiz questions");
       setQuizState((s) => ({ ...s, status: "error", error: msg }));
     }
   }
@@ -767,7 +711,7 @@ export default function AdminPanelV2() {
       await loadQuizQuestions();
       setQuizState((s) => ({ ...s, status: "idle", error: null }));
     } catch (e) {
-      const msg = e?.response?.data?.detail || "Failed to create question";
+      const msg = extractErrorMessage(e, "Failed to create question");
       setQuizState((s) => ({ ...s, status: "error", error: msg }));
     }
   }
@@ -782,7 +726,7 @@ export default function AdminPanelV2() {
       const res = await axios.get(`${API}/admin/audit-logs${qs}`, getAxiosConfig({ headers: { Authorization: `Bearer ${token}` } }));
       setAuditState((s) => ({ ...s, status: "idle", error: null, rows: res.data.items || [] }));
     } catch (e) {
-      const msg = e?.response?.data?.detail || "Failed to load audit logs";
+      const msg = extractErrorMessage(e, "Failed to load audit logs");
       setAuditState((s) => ({ ...s, status: "error", error: msg }));
     }
   }
@@ -808,7 +752,7 @@ export default function AdminPanelV2() {
       await loadQuizQuestions();
       setQuizState((s) => ({ ...s, status: "idle", error: null }));
     } catch (e) {
-      const msg = e?.response?.data?.detail || "Failed to update question";
+      const msg = extractErrorMessage(e, "Failed to update question");
       setQuizState((s) => ({ ...s, status: "error", error: msg }));
     }
   }
@@ -827,7 +771,7 @@ export default function AdminPanelV2() {
       newQuizQuestion();
       setQuizState((s) => ({ ...s, status: "idle", error: null }));
     } catch (e) {
-      const msg = e?.response?.data?.detail || "Failed to delete question";
+      const msg = extractErrorMessage(e, "Failed to delete question");
       setQuizState((s) => ({ ...s, status: "error", error: msg }));
     }
   }
@@ -838,7 +782,7 @@ export default function AdminPanelV2() {
       const res = await axios.get(`${API}/admin/applications`, getAxiosConfig({ headers: { Authorization: `Bearer ${token}` } }));
       setAppsState((s) => ({ ...s, status: "idle", rows: res.data.items || [], error: null }));
     } catch (e) {
-      const msg = e?.response?.data?.detail || "Failed to load applications";
+      const msg = extractErrorMessage(e, "Failed to load applications");
       setAppsState((s) => ({ ...s, status: "error", error: msg }));
     }
   }
@@ -849,7 +793,7 @@ export default function AdminPanelV2() {
       const res = await axios.get(`${API}/admin/applications/${id}`, getAxiosConfig({ headers: { Authorization: `Bearer ${token}` } }));
       setAppsState((s) => ({ ...s, status: "idle", selected: res.data, error: null }));
     } catch (e) {
-      const msg = e?.response?.data?.detail || "Failed to open application";
+      const msg = extractErrorMessage(e, "Failed to open application");
       setAppsState((s) => ({ ...s, status: "error", error: msg }));
     }
   }
@@ -865,7 +809,7 @@ export default function AdminPanelV2() {
       setCsvFilename(`pixwik-applications-${Date.now()}.csv`);
       setAppsState((s) => ({ ...s, status: "idle", csvUrl: url, error: null }));
     } catch (e) {
-      const msg = e?.response?.data?.detail || "CSV export failed";
+      const msg = extractErrorMessage(e, "CSV export failed");
       setAppsState((s) => ({ ...s, status: "error", error: msg }));
     }
   }
@@ -882,7 +826,7 @@ export default function AdminPanelV2() {
       setCandidatesCsvFilename(`pixwik-candidates-${Date.now()}.csv`);
       setCandidatesState((s) => ({ ...s, status: "idle", error: null, csvUrl: url }));
     } catch (e) {
-      const msg = e?.response?.data?.detail || "CSV export failed";
+      const msg = extractErrorMessage(e, "CSV export failed");
       setCandidatesState((s) => ({ ...s, status: "error", error: msg }));
     }
   }
@@ -904,7 +848,7 @@ export default function AdminPanelV2() {
         error: null,
       }));
     } catch (e) {
-      const msg = e?.response?.data?.detail || "Failed to load coding settings";
+      const msg = extractErrorMessage(e, "Failed to load coding settings");
       setCodingState((s) => ({ ...s, status: "error", error: msg }));
     }
   }
@@ -921,7 +865,7 @@ export default function AdminPanelV2() {
       setCodingDraft({ template_id: "", title_override: "" });
       await loadCoding();
     } catch (e) {
-      const msg = e?.response?.data?.detail || "Failed to create coding problem";
+      const msg = extractErrorMessage(e, "Failed to create coding problem");
       setCodingState((s) => ({ ...s, status: "error", error: msg }));
     }
   }
@@ -942,7 +886,7 @@ export default function AdminPanelV2() {
       await loadRounds();
       await loadCoding();
     } catch (e) {
-      const msg = e?.response?.data?.detail || "Failed to assign coding";
+      const msg = extractErrorMessage(e, "Failed to assign coding");
       setCodingState((s) => ({ ...s, status: "error", error: msg }));
     }
   }
@@ -957,7 +901,7 @@ export default function AdminPanelV2() {
       );
       await loadRounds();
     } catch (e) {
-      const msg = e?.response?.data?.detail || "Failed to disable coding";
+      const msg = extractErrorMessage(e, "Failed to disable coding");
       setCodingState((s) => ({ ...s, status: "error", error: msg }));
     }
   }
@@ -1040,7 +984,7 @@ export default function AdminPanelV2() {
             <CardContent className="space-y-4">
               {loginState.error ? (
                 <div className="quest-error" data-testid="admin-v2-login-error">
-                  {loginState.error}
+                  {extractErrorMessage(loginState.error)}
                 </div>
               ) : null}
 
@@ -1133,7 +1077,7 @@ export default function AdminPanelV2() {
                     </div>
                     {jobsState.error ? (
                       <div className="quest-error" data-testid="admin-v2-jobs-error">
-                        {jobsState.error}
+                        {extractErrorMessage(jobsState.error)}
                       </div>
                     ) : null}
                   </CardHeader>
@@ -1493,7 +1437,7 @@ export default function AdminPanelV2() {
 
                     {candidatesState.error ? (
                       <div className="quest-error" data-testid="admin-v2-candidates-error">
-                        {candidatesState.error}
+                        {extractErrorMessage(candidatesState.error)}
                       </div>
                     ) : null}
                   </CardHeader>
@@ -1740,7 +1684,7 @@ export default function AdminPanelV2() {
                             </Button>
                           </div>
 
-                          {scoresState.error ? <div className="quest-error">{scoresState.error}</div> : null}
+                          {scoresState.error ? <div className="quest-error">{extractErrorMessage(scoresState.error)}</div> : null}
 
                           <div className="rounded-xl border border-slate-200/70 overflow-hidden">
                             <Table>
@@ -1805,7 +1749,7 @@ export default function AdminPanelV2() {
                     </div>
                     {quizState.error ? (
                       <div className="quest-error" data-testid="admin-v2-quiz-error">
-                        {quizState.error}
+                        {extractErrorMessage(quizState.error)}
                       </div>
                     ) : null}
                   </CardHeader>
@@ -1983,7 +1927,7 @@ export default function AdminPanelV2() {
 
                     {codingState.error ? (
                       <div className="quest-error" data-testid="admin-v2-coding-error">
-                        {codingState.error}
+                        {extractErrorMessage(codingState.error)}
                       </div>
                     ) : null}
                   </CardHeader>
@@ -2110,7 +2054,7 @@ export default function AdminPanelV2() {
                   <CardContent className="space-y-3">
                     {appsState.error ? (
                       <div className="quest-error" data-testid="admin-v2-apps-error">
-                        {appsState.error}
+                        {extractErrorMessage(appsState.error)}
                       </div>
                     ) : null}
 
@@ -2171,7 +2115,7 @@ export default function AdminPanelV2() {
                     </Button>
                   </div>
 
-                  {auditState.error ? <div className="quest-error">{auditState.error}</div> : null}
+                  {auditState.error ? <div className="quest-error">{extractErrorMessage(auditState.error)}</div> : null}
 
                   <div className="flex flex-wrap items-center gap-2" data-testid="admin-v2-audit-filters">
                     <div className="min-w-[260px]">
@@ -2411,7 +2355,7 @@ export default function AdminPanelV2() {
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      {adminsState.error ? <div className="quest-error">{typeof adminsState.error === "string" ? adminsState.error : JSON.stringify(adminsState.error)}</div> : null}
+                      {adminsState.error ? <div className="quest-error">{extractErrorMessage(adminsState.error)}</div> : null}
                       <div className="space-y-2">
                         <Label>Username</Label>
                         <Input

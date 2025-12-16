@@ -3,25 +3,12 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
 import PixwikLogo from "@/assets/pixwik-logo.svg";
+import { API, getAxiosConfig, extractErrorMessage } from "@/config/api";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-
-const BACKEND_URL = "https://careersbackend.pixwik.com";
-const API = `${BACKEND_URL}/api`;
-
-// Helper function to add ngrok bypass header to axios config
-function getAxiosConfig(config = {}) {
-  return {
-    ...config,
-    headers: {
-      'ngrok-skip-browser-warning': 'true',
-      ...(config.headers || {})
-    }
-  };
-}
 
 const TOKEN_KEY = "pixwik_candidate_token";
 
@@ -64,7 +51,7 @@ export default function CandidateQuiz() {
         if (!mounted) return;
         setState({ status: "ready", error: null, round: res.data.round, items: res.data.items || [] });
       } catch (e) {
-        const msg = e?.response?.data?.detail || "Failed to load quiz";
+        const msg = extractErrorMessage(e, "Failed to load quiz");
         if (!mounted) return;
         setState({ status: "error", error: msg, round: null, items: [] });
       }
@@ -93,7 +80,7 @@ export default function CandidateQuiz() {
       setSubmitState({ status: "success", error: null });
       navigate("/candidate");
     } catch (e) {
-      const msg = e?.response?.data?.detail || "Submission failed";
+      const msg = extractErrorMessage(e, "Submission failed");
       setSubmitState({ status: "error", error: msg });
     }
   }
@@ -134,7 +121,7 @@ export default function CandidateQuiz() {
 
         {state.status === "error" ? (
           <div className="quest-error" data-testid="candidate-quiz-error">
-            {state.error}
+            {extractErrorMessage(state.error)}
           </div>
         ) : null}
 
@@ -184,7 +171,7 @@ export default function CandidateQuiz() {
 
               {submitState.error ? (
                 <div className="quest-error" data-testid="candidate-quiz-submit-error">
-                  {submitState.error}
+                  {extractErrorMessage(submitState.error)}
                 </div>
               ) : null}
 

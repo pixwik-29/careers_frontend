@@ -2,24 +2,11 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 
 import PixwikLogo from "@/assets/pixwik-logo.svg";
+import { API, getAxiosConfig, extractErrorMessage } from "@/config/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-
-const BACKEND_URL = "https://careersbackend.pixwik.com";
-const API = `${BACKEND_URL}/api`;
-
-// Helper function to add ngrok bypass header to axios config
-function getAxiosConfig(config = {}) {
-  return {
-    ...config,
-    headers: {
-      'ngrok-skip-browser-warning': 'true',
-      ...(config.headers || {})
-    }
-  };
-}
 
 function formatDate(dateStr) {
   try {
@@ -125,7 +112,7 @@ export default function JobsBoard() {
         if (!mounted) return;
         setState({ status: "ready", error: null, jobs: res.data.items || [] });
       } catch (e) {
-        const msg = e?.response?.data?.detail || "Failed to load job postings";
+        const msg = extractErrorMessage(e, "Failed to load job postings");
         if (!mounted) return;
         setState({ status: "error", error: msg, jobs: [] });
       }
@@ -173,7 +160,7 @@ export default function JobsBoard() {
 
         {state.status === "error" ? (
           <div className="quest-error" data-testid="jobs-board-error">
-            {state.error}
+            {extractErrorMessage(state.error)}
           </div>
         ) : null}
 
@@ -190,10 +177,11 @@ export default function JobsBoard() {
             </div>
           ) : null}
 
-          {state.jobs.map((job) => (
+          {/* {state.jobs.map((job) => (
             <JobCard key={job.id} job={job} />
-          ))}
+          ))} */}
         </div>
+        <div style={{ textAlign: "center", marginTop: "20px" ,fontSize: "20px" ,color: "green"}}>We Will come back with more jobs soon!</div>
 
         <footer className="quest-footer" data-testid="jobs-footer">
           <div className="text-sm text-slate-600" data-testid="jobs-privacy">

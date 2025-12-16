@@ -3,24 +3,11 @@ import axios from "axios";
 import { useParams } from "react-router-dom";
 
 import PixwikLogo from "@/assets/pixwik-logo.svg";
+import { API, getAxiosConfig, extractErrorMessage } from "@/config/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-
-const BACKEND_URL = "https://careersbackend.pixwik.com";
-const API = `${BACKEND_URL}/api`;
-
-// Helper function to add ngrok bypass header to axios config
-function getAxiosConfig(config = {}) {
-  return {
-    ...config,
-    headers: {
-      'ngrok-skip-browser-warning': 'true',
-      ...(config.headers || {})
-    }
-  };
-}
 
 function formatDate(dateStr) {
   try {
@@ -57,7 +44,7 @@ export default function JobPosting() {
         if (!mounted) return;
         setState({ status: "ready", error: null, job: res.data });
       } catch (e) {
-        const msg = e?.response?.data?.detail || "Job not found";
+        const msg = extractErrorMessage(e, "Job not found");
         if (!mounted) return;
         setState({ status: "error", error: msg, job: null });
       }
@@ -99,7 +86,7 @@ export default function JobPosting() {
         </div>
         {state.status === "error" ? (
           <div className="quest-error" data-testid="job-posting-error">
-            {state.error}
+            {extractErrorMessage(state.error)}
           </div>
         ) : null}
 

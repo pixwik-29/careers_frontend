@@ -3,6 +3,7 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
 import PixwikLogo from "@/assets/pixwik-logo.svg";
+import { API, getAxiosConfig, extractErrorMessage } from "@/config/api";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,20 +11,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-
-const BACKEND_URL = "https://careersbackend.pixwik.com";
-const API = `${BACKEND_URL}/api`;
-
-// Helper function to add ngrok bypass header to axios config
-function getAxiosConfig(config = {}) {
-  return {
-    ...config,
-    headers: {
-      'ngrok-skip-browser-warning': 'true',
-      ...(config.headers || {})
-    }
-  };
-}
 
 const TOKEN_KEY = "pixwik_candidate_token";
 
@@ -62,7 +49,7 @@ export default function CandidatePortal() {
       }));
       setMeState({ status: "ready", error: null, data: res.data });
     } catch (e) {
-      const msg = e?.response?.data?.detail || "Failed to load portal";
+      const msg = extractErrorMessage(e, "Failed to load portal");
       setMeState({ status: "error", error: msg, data: null });
     }
   }
@@ -82,7 +69,7 @@ export default function CandidatePortal() {
       setToken(res.data.token);
       setLoginState({ status: "idle", error: null });
     } catch (e) {
-      const msg = e?.response?.data?.detail || "Login failed";
+      const msg = extractErrorMessage(e, "Login failed");
       setLoginState({ status: "error", error: msg });
     }
   }
@@ -144,7 +131,7 @@ export default function CandidatePortal() {
             <CardContent className="space-y-4">
               {loginState.error ? (
                 <div className="quest-error" data-testid="candidate-login-error">
-                  {loginState.error}
+                  {extractErrorMessage(loginState.error)}
                 </div>
               ) : null}
 
@@ -207,7 +194,7 @@ export default function CandidatePortal() {
               ) : null}
 
               {meState.error ? (
-                <div className="quest-error" data-testid="candidate-error">{meState.error}</div>
+                <div className="quest-error" data-testid="candidate-error">{extractErrorMessage(meState.error)}</div>
               ) : null}
 
               {candidate && round ? (

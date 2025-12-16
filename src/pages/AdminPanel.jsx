@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 
 import PixwikLogo from "@/assets/pixwik-logo.svg";
+import { API, getAxiosConfig, extractErrorMessage } from "@/config/api";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,20 +10,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-
-const BACKEND_URL ="https://careersbackend.pixwik.com";
-const API = `${BACKEND_URL}/api`;
-
-// Helper function to add ngrok bypass header to axios config
-function getAxiosConfig(config = {}) {
-  return {
-    ...config,
-    headers: {
-      'ngrok-skip-browser-warning': 'true',
-      ...(config.headers || {})
-    }
-  };
-}
 
 function formatDate(iso) {
   try {
@@ -82,7 +69,7 @@ export default function AdminPanel() {
       setAppsState((s) => ({ ...s, status: "idle", error: null }));
       setJobsState((s) => ({ ...s, status: "idle", error: null }));
     } catch (e) {
-      const msg = e?.response?.data?.detail || "Login failed";
+      const msg = extractErrorMessage(e, "Login failed");
       setAppsState((s) => ({ ...s, status: "error", error: msg }));
     }
   }
@@ -95,7 +82,7 @@ export default function AdminPanel() {
       });
       setAppsState((s) => ({ ...s, status: "idle", rows: res.data.items || [], error: null }));
     } catch (e) {
-      const msg = e?.response?.data?.detail || "Failed to load applications";
+      const msg = extractErrorMessage(e, "Failed to load applications");
       setAppsState((s) => ({ ...s, status: "error", error: msg }));
     }
   }
@@ -108,7 +95,7 @@ export default function AdminPanel() {
       });
       setAppsState((s) => ({ ...s, status: "idle", selected: res.data, error: null }));
     } catch (e) {
-      const msg = e?.response?.data?.detail || "Failed to open application";
+      const msg = extractErrorMessage(e, "Failed to open application");
       setAppsState((s) => ({ ...s, status: "error", error: msg }));
     }
   }
@@ -123,7 +110,7 @@ export default function AdminPanel() {
       const url = URL.createObjectURL(res.data);
       setAppsState((s) => ({ ...s, status: "idle", csvUrl: url, error: null }));
     } catch (e) {
-      const msg = e?.response?.data?.detail || "CSV export failed";
+      const msg = extractErrorMessage(e, "CSV export failed");
       setAppsState((s) => ({ ...s, status: "error", error: msg }));
     }
   }
@@ -136,7 +123,7 @@ export default function AdminPanel() {
       });
       setJobsState((s) => ({ ...s, status: "idle", rows: res.data.items || [], error: null }));
     } catch (e) {
-      const msg = e?.response?.data?.detail || "Failed to load jobs";
+      const msg = extractErrorMessage(e, "Failed to load jobs");
       setJobsState((s) => ({ ...s, status: "error", error: msg }));
     }
   }
@@ -194,7 +181,7 @@ export default function AdminPanel() {
       await loadJobs();
       setJobsState((s) => ({ ...s, status: "idle", error: null }));
     } catch (e) {
-      const msg = e?.response?.data?.detail || "Failed to create job";
+      const msg = extractErrorMessage(e, "Failed to create job");
       setJobsState((s) => ({ ...s, status: "error", error: msg }));
     }
   }
@@ -229,7 +216,7 @@ export default function AdminPanel() {
       await loadJobs();
       setJobsState((s) => ({ ...s, status: "idle", error: null }));
     } catch (e) {
-      const msg = e?.response?.data?.detail || "Failed to update job";
+      const msg = extractErrorMessage(e, "Failed to update job");
       setJobsState((s) => ({ ...s, status: "error", error: msg }));
     }
   }
@@ -246,7 +233,7 @@ export default function AdminPanel() {
       await loadJobs();
       setJobsState((s) => ({ ...s, status: "idle", error: null }));
     } catch (e) {
-      const msg = e?.response?.data?.detail || "Failed to delete job";
+      const msg = extractErrorMessage(e, "Failed to delete job");
       setJobsState((s) => ({ ...s, status: "error", error: msg }));
     }
   }
@@ -325,7 +312,7 @@ export default function AdminPanel() {
             <CardContent className="space-y-4">
               {appsState.error ? (
                 <div className="quest-error" data-testid="admin-login-error">
-                  {appsState.error}
+                  {extractErrorMessage(appsState.error)}
                 </div>
               ) : null}
 
@@ -402,7 +389,7 @@ export default function AdminPanel() {
               <CardContent className="space-y-3">
                 {appsState.error ? (
                   <div className="quest-error" data-testid="admin-error">
-                    {appsState.error}
+                    {extractErrorMessage(appsState.error)}
                   </div>
                 ) : null}
 

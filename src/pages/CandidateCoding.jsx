@@ -4,26 +4,13 @@ import { useNavigate } from "react-router-dom";
 import Editor from "@monaco-editor/react";
 
 import PixwikLogo from "@/assets/pixwik-logo.svg";
+import { API, getAxiosConfig, extractErrorMessage } from "@/config/api";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-
-const BACKEND_URL = "https://careersbackend.pixwik.com";
-const API = `${BACKEND_URL}/api`;
-
-// Helper function to add ngrok bypass header to axios config
-function getAxiosConfig(config = {}) {
-  return {
-    ...config,
-    headers: {
-      'ngrok-skip-browser-warning': 'true',
-      ...(config.headers || {})
-    }
-  };
-}
 
 const TOKEN_KEY = "pixwik_candidate_token";
 
@@ -76,7 +63,7 @@ export default function CandidateCoding() {
         setCode(problem?.starter_python || "");
         setLanguage("python");
       } catch (e) {
-        const msg = e?.response?.data?.detail || "Failed to load coding task";
+        const msg = extractErrorMessage(e, "Failed to load coding task");
         if (!mounted) return;
         setState({ status: "error", error: msg, round: null, problem: null });
       }
@@ -115,7 +102,7 @@ export default function CandidateCoding() {
       );
       setRunState({ status: "ready", error: null, result: res.data });
     } catch (e) {
-      const msg = e?.response?.data?.detail || "Run failed";
+      const msg = extractErrorMessage(e, "Run failed");
       setRunState({ status: "error", error: msg, result: null });
     }
   }
@@ -134,7 +121,7 @@ export default function CandidateCoding() {
       setSubmitState({ status: "ready", error: null, result: res.data });
       navigate("/candidate");
     } catch (e) {
-      const msg = e?.response?.data?.detail || "Submit failed";
+      const msg = extractErrorMessage(e, "Submit failed");
       setSubmitState({ status: "error", error: msg, result: null });
     }
   }
@@ -172,7 +159,7 @@ export default function CandidateCoding() {
         ) : null}
 
         {state.status === "error" ? (
-          <div className="quest-error" data-testid="candidate-coding-error">{state.error}</div>
+          <div className="quest-error" data-testid="candidate-coding-error">{extractErrorMessage(state.error)}</div>
         ) : null}
 
         {state.status === "ready" && state.problem ? (
@@ -231,7 +218,7 @@ export default function CandidateCoding() {
                 </div>
 
                 {runState.error ? (
-                  <div className="quest-error" data-testid="candidate-coding-run-error">{runState.error}</div>
+                  <div className="quest-error" data-testid="candidate-coding-run-error">{extractErrorMessage(runState.error)}</div>
                 ) : null}
 
                 {runState.result ? (

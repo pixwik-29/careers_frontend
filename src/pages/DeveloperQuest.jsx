@@ -3,6 +3,7 @@ import axios from "axios";
 import confetti from "canvas-confetti";
 
 import PixwikLogo from "@/assets/pixwik-logo.svg";
+import { API, getAxiosConfig, extractErrorMessage } from "@/config/api";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,20 +16,6 @@ import { Slider } from "@/components/ui/slider";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-
-const BACKEND_URL = "https://careersbackend.pixwik.com";
-const API = `${BACKEND_URL}/api`;
-
-// Helper function to add ngrok bypass header to axios config
-function getAxiosConfig(config = {}) {
-  return {
-    ...config,
-    headers: {
-      'ngrok-skip-browser-warning': 'true',
-      ...(config.headers || {})
-    }
-  };
-}
 
 const SKILLS = [
   "JavaScript",
@@ -360,7 +347,7 @@ export default function DeveloperQuest() {
       setSubmitState({ status: "success", error: null, result: res.data });
       setScreen("success");
     } catch (e) {
-      const msg = e?.response?.data?.detail || "Submission failed. Please try again.";
+      const msg = extractErrorMessage(e, "Submission failed. Please try again.");
       setSubmitState({ status: "error", error: msg, result: null });
       pushToast("Submission failed", msg);
     }
@@ -908,7 +895,7 @@ export default function DeveloperQuest() {
 
                   {submitState.status === "error" ? (
                     <div className="quest-error" data-testid="submit-error">
-                      {submitState.error}
+                      {extractErrorMessage(submitState.error)}
                     </div>
                   ) : null}
 
