@@ -24,8 +24,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 
-const BACKEND_URL = "https://careersnackend.pixwik.com";
+const BACKEND_URL = "https://careersbackend.pixwik.com";
+console.log(BACKEND_URL,"=================>BACKEND_URL");
+
 const API = `${BACKEND_URL}/api`;
+
+console.log(API,"===================>API");
+
 
 // Helper function to add ngrok bypass header to axios config
 function getAxiosConfig(config = {}) {

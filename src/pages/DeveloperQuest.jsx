@@ -16,7 +16,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "https://5ce2ff1765f7.ngrok-free.app";
+const BACKEND_URL = "https://careersbackend.pixwik.com";
 const API = `${BACKEND_URL}/api`;
 
 // Helper function to add ngrok bypass header to axios config
