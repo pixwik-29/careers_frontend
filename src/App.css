@@ -1,0 +1,333 @@
+.app-root {
+  min-height: 100vh;
+}
+
+.quest-page {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+.quest-backdrop {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(900px 600px at 18% 12%, rgba(14, 165, 233, 0.18), transparent 60%),
+    radial-gradient(800px 500px at 82% 18%, rgba(20, 184, 166, 0.16), transparent 60%),
+    radial-gradient(900px 600px at 40% 92%, rgba(167, 139, 250, 0.14), transparent 55%),
+    linear-gradient(180deg, rgba(255, 255, 255, 1) 0%, rgba(248, 250, 252, 1) 55%, rgba(255, 255, 255, 1) 100%);
+  pointer-events: none;
+}
+
+.quest-backdrop::after {
+  content: "";
+  position: absolute;
+  inset: -120px;
+  background-image:
+    radial-gradient(circle, rgba(15, 23, 42, 0.08) 1px, transparent 1px),
+    radial-gradient(circle, rgba(15, 23, 42, 0.05) 1px, transparent 1px);
+  background-size: 46px 46px, 62px 62px;
+  background-position: 0 0, 18px 22px;
+  mask-image: radial-gradient(500px 300px at 25% 10%, black 40%, transparent 70%);
+  opacity: 0.7;
+}
+
+.quest-container {
+  position: relative;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 86px 18px 48px;
+}
+
+.quest-brand {
+  position: fixed;
+  top: 22px;
+  left: 24px;
+  z-index: 50;
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  transition: opacity 140ms ease;
+}
+
+.quest-brand:hover {
+  opacity: 0.88;
+}
+
+.quest-brand--visible {
+  opacity: 1;
+}
+
+/* Only hide on mobile when user scrolls */
+@media (max-width: 767px) {
+  .quest-brand--hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+
+.quest-brand__logo {
+  height: 20px;
+  width: auto;
+  display: block;
+}
+
+.quest-topbar {
+  margin-bottom: 18px;
+}
+
+.quest-progress {
+  width: 180px;
+  text-align: right;
+}
+
+@media (min-width: 768px) {
+  .quest-progress {
+    width: 220px;
+  }
+}
+
+.quest-hero {
+  padding-top: 10px;
+}
+
+.quest-hero__grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 18px;
+  align-items: start;
+}
+
+@media (min-width: 1024px) {
+  .quest-hero__grid {
+    grid-template-columns: 1.2fr 0.8fr;
+    gap: 24px;
+  }
+}
+
+.quest-hero__card {
+  position: relative;
+}
+
+.quest-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 30% 30%, rgba(249, 115, 22, 1), rgba(167, 139, 250, 0.9));
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
+}
+
+.quest-card {
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(10px);
+}
+
+.quest-primary {
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(14, 165, 233, 1) 0%, rgba(20, 184, 166, 1) 55%, rgba(167, 139, 250, 1) 100%);
+  box-shadow: 0 12px 30px rgba(2, 132, 199, 0.22);
+  transition: box-shadow 180ms ease, filter 180ms ease;
+}
+
+.quest-primary:hover {
+  filter: brightness(1.03);
+  box-shadow: 0 14px 34px rgba(2, 132, 199, 0.3);
+}
+
+.quest-primary:active {
+  filter: brightness(0.99);
+}
+
+.quest-mini-badge {
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.04);
+  color: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.quest-badge {
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.88);
+  color: white;
+}
+
+.quest-xp {
+  border-radius: 999px;
+}
+
+.quest-list {
+  display: grid;
+  gap: 10px;
+}
+
+.quest-list__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: rgba(15, 23, 42, 0.85);
+}
+
+.quest-list__icon {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: rgba(20, 184, 166, 0.12);
+  color: rgba(13, 148, 136, 0.9);
+  border: 1px solid rgba(20, 184, 166, 0.2);
+}
+
+.quest-footer {
+  margin-top: 26px;
+}
+
+.quest-choice {
+  text-align: left;
+  border-radius: 16px;
+  padding: 14px 12px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(255, 255, 255, 0.75);
+  transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.quest-choice:hover {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(14, 165, 233, 0.35);
+  box-shadow: 0 16px 26px rgba(2, 132, 199, 0.12);
+}
+
+.quest-choice--active {
+  border-color: rgba(20, 184, 166, 0.55);
+  box-shadow: 0 20px 30px rgba(13, 148, 136, 0.12);
+}
+
+.quest-choice__key {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: rgba(15, 23, 42, 0.06);
+  color: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+.quest-choice__text {
+  margin-top: 10px;
+  color: rgba(15, 23, 42, 0.85);
+}
+
+.quest-error {
+  margin-top: 6px;
+  font-size: 0.9rem;
+  color: rgba(190, 18, 60, 0.95);
+}
+
+.quest-hint {
+  border-radius: 16px;
+  padding: 12px 14px;
+  background: linear-gradient(90deg, rgba(14, 165, 233, 0.12), rgba(167, 139, 250, 0.1));
+  border: 1px solid rgba(14, 165, 233, 0.18);
+  color: rgba(15, 23, 42, 0.75);
+}
+
+.quest-avatar-button {
+  border-radius: 18px;
+  padding: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(255, 255, 255, 0.65);
+  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+
+.quest-avatar-button:hover {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(167, 139, 250, 0.35);
+  box-shadow: 0 20px 30px rgba(99, 102, 241, 0.12);
+}
+
+.quest-avatar {
+  position: relative;
+  width: 78px;
+  height: 78px;
+  border-radius: 20px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+  overflow: hidden;
+}
+
+.quest-avatar--selected {
+  outline: 3px solid rgba(14, 165, 233, 0.35);
+}
+
+.quest-avatar__pixel {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.quest-avatar__pixel:nth-child(1) {
+  left: 16px;
+  top: 18px;
+}
+
+.quest-avatar__pixel:nth-child(2) {
+  left: 40px;
+  top: 14px;
+}
+
+.quest-avatar__pixel:nth-child(3) {
+  left: 26px;
+  top: 40px;
+}
+
+.quest-avatar__pixel:nth-child(4) {
+  left: 48px;
+  top: 44px;
+}
+
+.quest-skill {
+  border-radius: 999px;
+  transition: box-shadow 140ms ease, border-color 140ms ease;
+}
+
+.quest-teaser {
+  border-radius: 18px;
+  padding: 14px;
+  background: rgba(15, 23, 42, 0.03);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+}
+
+.quest-consent {
+  margin-top: 10px;
+  font-size: 0.9rem;
+  color: rgba(15, 23, 42, 0.75);
+}
+
+.quest-success-badge {
+  border-radius: 22px;
+  padding: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.14), rgba(20, 184, 166, 0.1), rgba(167, 139, 250, 0.1));
+}
+
+.quest-link {
+  display: inline-block;
+  color: rgba(2, 132, 199, 1);
+  text-decoration: none;
+  border-bottom: 1px dashed rgba(2, 132, 199, 0.55);
+  transition: color 150ms ease, border-color 150ms ease;
+}
+
+.quest-link:hover {
+  color: rgba(13, 148, 136, 1);
+  border-color: rgba(13, 148, 136, 0.55);
+}
