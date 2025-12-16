@@ -1,0 +1,14 @@
+{
+  "files": {
+    "main.css": "/static/css/main.e2f611e9.css",
+    "main.js": "/static/js/main.23ee52cb.js",
+    "index.html": "/index.html",
+    "static/media/pixwik-logo.svg": "/static/media/pixwik-logo.7d1cc029e18d8083509512c458a3febb.svg",
+    "main.e2f611e9.css.map": "/static/css/main.e2f611e9.css.map",
+    "main.23ee52cb.js.map": "/static/js/main.23ee52cb.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.e2f611e9.css",
+    "static/js/main.23ee52cb.js"
+  ]
+}
