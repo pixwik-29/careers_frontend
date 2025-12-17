@@ -3,7 +3,7 @@ import axios from "axios";
 import confetti from "canvas-confetti";
 
 import PixwikLogo from "@/assets/pixwik-logo.svg";
-import { API, getAxiosConfig, extractErrorMessage } from "@/config/api";
+import { API, BACKEND_URL, getAxiosConfig, extractErrorMessage } from "@/config/api";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";

@@ -177,11 +177,11 @@ export default function JobsBoard() {
             </div>
           ) : null}
 
-          {/* {state.jobs.map((job) => (
+          {state.jobs.map((job) => (
             <JobCard key={job.id} job={job} />
-          ))} */}
+          ))}
         </div>
-        <div style={{ textAlign: "center", marginTop: "20px" ,fontSize: "20px" ,color: "green"}}>We Will come back with more jobs soon!</div>
+        {/* <div style={{ textAlign: "center", marginTop: "20px" ,fontSize: "20px" ,color: "green"}}>We Will come back with more jobs soon!</div> */}
 
         <footer className="quest-footer" data-testid="jobs-footer">
           <div className="text-sm text-slate-600" data-testid="jobs-privacy">
