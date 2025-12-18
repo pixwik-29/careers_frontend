@@ -30,8 +30,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Copy, Check, Play } from "lucide-react";
+import { Copy, Check, Play, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { json } from "monaco-editor";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+  PaginationEllipsis,
+} from "@/components/ui/pagination";
 
 function formatDateTime(iso) {
   try {
@@ -155,6 +164,11 @@ export default function AdminPanelV2() {
   const [draft, setDraft] = useState(EMPTY_DRAFT);
 
   const [appsState, setAppsState] = useState({ status: "idle", error: null, rows: [], selected: null, csvUrl: null });
+  const [appSearch, setAppSearch] = useState("");
+  const [appPagination, setAppPagination] = useState({
+    page: 1,
+    page_size: 10,
+  });
   const [applicationDetailsOpen, setApplicationDetailsOpen] = useState(false);
   const [csvFilename, setCsvFilename] = useState("pixwik-applications.csv");
   const [candidatesCsvFilename, setCandidatesCsvFilename] = useState("pixwik-candidates.csv");
@@ -177,6 +191,15 @@ export default function AdminPanelV2() {
   const [candidateJobFilter, setCandidateJobFilter] = useState("all");
   const [candidateStatusFilter, setCandidateStatusFilter] = useState("all");
   const [candidateRoundFilter, setCandidateRoundFilter] = useState("all");
+  const [candidateSearch, setCandidateSearch] = useState("");
+  const [candidatePagination, setCandidatePagination] = useState({
+    page: 1,
+    page_size: 10,
+    total_count: 0,
+    total_pages: 0,
+    has_next: false,
+    has_prev: false,
+  });
 
 
   const [codingState, setCodingState] = useState({ status: "idle", error: null, templates: [], problems: [], selectedProblemId: "" });
@@ -455,20 +478,48 @@ export default function AdminPanelV2() {
     }
   }
 
-  async function loadCandidates() {
+  async function loadCandidates(page = null) {
     setCandidatesState((s) => ({ ...s, status: "loading", error: null }));
     try {
-      const params = [];
-      if (candidateJobFilter && candidateJobFilter !== "all") params.push(`job_slug=${encodeURIComponent(candidateJobFilter)}`);
+      const currentPage = page !== null ? page : candidatePagination.page;
+      const requestBody = {
+        page: currentPage,
+        page_size: candidatePagination.page_size,
+      };
+      
+      if (candidateJobFilter && candidateJobFilter !== "all") {
+        requestBody.job_slug = candidateJobFilter;
+      }
+      
+      // Add search parameter if search text exists
+      if (candidateSearch && candidateSearch.trim().length > 0) {
+        requestBody.search = candidateSearch.trim();
+      }
+      
       // status + round filters are applied client-side (keeps backend simple and avoids extra query work)
-      const qs = params.length ? `?${params.join("&")}` : "";
-      const res = await axios.get(`${API}/admin/candidates${qs}`, getAxiosConfig({ headers: { Authorization: `Bearer ${token}` } }));
+      const res = await axios.post(
+        `${API}/admin/candidates`,
+        requestBody,
+        getAxiosConfig({ headers: { Authorization: `Bearer ${token}` } })
+      );
       let rows = res.data.items || [];
       if (candidateStatusFilter !== "all") {
         rows = rows.filter((c) => String(c.status || "") === candidateStatusFilter);
       }
       if (candidateRoundFilter !== "all") {
         rows = rows.filter((c) => String(c.current_round || "") === candidateRoundFilter);
+      }
+
+      // Update pagination state from API response
+      if (res.data.pagination) {
+        setCandidatePagination({
+          page: res.data.pagination.page || currentPage,
+          page_size: res.data.pagination.page_size || candidatePagination.page_size,
+          total_count: res.data.pagination.total_count || 0,
+          total_pages: res.data.pagination.total_pages || 0,
+          has_next: res.data.pagination.has_next || false,
+          has_prev: res.data.pagination.has_prev || false,
+        });
       }
 
       setCandidatesState((s) => ({ ...s, status: "idle", rows, error: null }));
@@ -1297,7 +1348,9 @@ export default function AdminPanelV2() {
     const t = setTimeout(() => {
       loadJobs();
       loadRounds();
-      loadCandidates();
+      // Reset to page 1 when filters change
+      setCandidatePagination((p) => ({ ...p, page: 1 }));
+      loadCandidates(1);
       loadQuizQuestions();
       loadCoding();
       loadApplications();
@@ -1310,8 +1363,39 @@ export default function AdminPanelV2() {
     // eslint-disable-next-line
   }, [isAuthed, adminRole, candidateJobFilter]);
 
+
   const selectedApplication = appsState.selected;
   const selectedJob = useMemo(() => jobsState.rows.find((j) => j.id === jobsState.selectedId) || null, [jobsState.rows, jobsState.selectedId]);
+
+  // Filter and paginate applications
+  const filteredAndPaginatedApps = useMemo(() => {
+    let filtered = appsState.rows;
+    
+    // Apply search filter (name and email)
+    if (appSearch.trim()) {
+      const searchLower = appSearch.trim().toLowerCase();
+      filtered = filtered.filter((app) => {
+        const nameMatch = (app.name || "").toLowerCase().includes(searchLower);
+        const emailMatch = (app.email || "").toLowerCase().includes(searchLower);
+        return nameMatch || emailMatch;
+      });
+    }
+    
+    // Calculate pagination
+    const totalCount = filtered.length;
+    const totalPages = Math.ceil(totalCount / appPagination.page_size);
+    const startIndex = (appPagination.page - 1) * appPagination.page_size;
+    const endIndex = startIndex + appPagination.page_size;
+    const paginated = filtered.slice(startIndex, endIndex);
+    
+    return {
+      rows: paginated,
+      totalCount,
+      totalPages,
+      hasNext: appPagination.page < totalPages,
+      hasPrev: appPagination.page > 1,
+    };
+  }, [appsState.rows, appSearch, appPagination.page, appPagination.page_size]);
 
   const downloadResumeHref = useMemo(() => {
     if (!selectedApplication?.id) return null;
@@ -1734,6 +1818,34 @@ export default function AdminPanelV2() {
                       </div>
 
                     <div className="flex flex-wrap items-center gap-2" data-testid="admin-v2-candidates-filters">
+                      <div className="min-w-[260px]" data-testid="admin-v2-candidates-search">
+                        <div className="relative">
+                          <Input
+                            type="text"
+                            placeholder="Search candidates..."
+                            value={candidateSearch}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setCandidateSearch(value);
+                            }}
+                            className={candidateSearch ? "pr-8" : ""}
+                            data-testid="admin-v2-candidates-search-input"
+                          />
+                          {candidateSearch && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0"
+                              onClick={() => {
+                                setCandidateSearch("");
+                              }}
+                              data-testid="admin-v2-candidates-search-clear"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
                       <div className="min-w-[260px]" data-testid="admin-v2-candidates-job-filter">
                         <Select value={candidateJobFilter} onValueChange={(v) => setCandidateJobFilter(v)}>
                           <SelectTrigger data-testid="admin-v2-candidates-job-filter-trigger">
@@ -1788,7 +1900,8 @@ export default function AdminPanelV2() {
                         data-testid="admin-v2-candidates-apply-filter"
                         onClick={() => {
                           setSelectedCandidateIds([]);
-                          loadCandidates();
+                          setCandidatePagination((p) => ({ ...p, page: 1 }));
+                          loadCandidates(1);
                         }}
                       >
                         Apply
@@ -1837,8 +1950,13 @@ export default function AdminPanelV2() {
                   </CardHeader>
 
                   <CardContent className="space-y-3" data-testid="admin-v2-candidates-list">
-                    <div className="rounded-xl border border-slate-200/70 overflow-hidden" data-testid="admin-v2-candidates-table-wrapper">
-                      <Table data-testid="admin-v2-candidates-table">
+                    {candidatesState.status === "loading" ? (
+                      <div className="flex items-center justify-center py-8" data-testid="admin-v2-candidates-loading">
+                        <div className="text-sm text-slate-600">Loading candidates...</div>
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border border-slate-200/70 overflow-hidden" data-testid="admin-v2-candidates-table-wrapper">
+                        <Table data-testid="admin-v2-candidates-table">
                         <TableHeader>
                           <TableRow>
                             <TableHead className="w-[38px]" data-testid="admin-v2-cand-th-select">
@@ -1951,7 +2069,90 @@ export default function AdminPanelV2() {
                           ))}
                         </TableBody>
                       </Table>
-                    </div>
+                      </div>
+                    )}
+                    
+                    {/* Pagination */}
+                    {candidatesState.status !== "loading" && candidatePagination.total_pages > 0 && (
+                      <div className="flex items-center justify-between mt-4 pt-4 border-t" data-testid="admin-v2-candidates-pagination">
+                        <div className="text-sm text-slate-600" data-testid="admin-v2-candidates-pagination-info">
+                          Showing {((candidatePagination.page - 1) * candidatePagination.page_size) + 1} to{" "}
+                          {Math.min(candidatePagination.page * candidatePagination.page_size, candidatePagination.total_count)} of{" "}
+                          {candidatePagination.total_count} candidates
+                        </div>
+                        <Pagination>
+                          <PaginationContent>
+                            <PaginationItem>
+                              <PaginationPrevious
+                                href="#"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  if (candidatePagination.has_prev) {
+                                    loadCandidates(candidatePagination.page - 1);
+                                  }
+                                }}
+                                className={!candidatePagination.has_prev ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                                data-testid="admin-v2-candidates-pagination-prev"
+                              />
+                            </PaginationItem>
+                            
+                            {/* Page numbers */}
+                            {Array.from({ length: candidatePagination.total_pages }, (_, i) => i + 1).map((pageNum) => {
+                              // Show first page, last page, current page, and pages around current
+                              const showPage = 
+                                pageNum === 1 ||
+                                pageNum === candidatePagination.total_pages ||
+                                (pageNum >= candidatePagination.page - 1 && pageNum <= candidatePagination.page + 1);
+                              
+                              if (!showPage) {
+                                // Show ellipsis
+                                if (pageNum === candidatePagination.page - 2 || pageNum === candidatePagination.page + 2) {
+                                  return (
+                                    <PaginationItem key={pageNum}>
+                                      <PaginationEllipsis />
+                                    </PaginationItem>
+                                  );
+                                }
+                                return null;
+                              }
+                              
+                              return (
+                                <PaginationItem key={pageNum}>
+                                  <PaginationLink
+                                    href="#"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      if (pageNum !== candidatePagination.page) {
+                                        loadCandidates(pageNum);
+                                      }
+                                    }}
+                                    isActive={pageNum === candidatePagination.page}
+                                    className="cursor-pointer"
+                                    data-testid={`admin-v2-candidates-pagination-page-${pageNum}`}
+                                  >
+                                    {pageNum}
+                                  </PaginationLink>
+                                </PaginationItem>
+                              );
+                            })}
+                            
+                            <PaginationItem>
+                              <PaginationNext
+                                href="#"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  if (candidatePagination.has_next) {
+                                    loadCandidates(candidatePagination.page + 1);
+                                  }
+                                }}
+                                className={!candidatePagination.has_next ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                                data-testid="admin-v2-candidates-pagination-next"
+                              />
+                            </PaginationItem>
+                          </PaginationContent>
+                        </Pagination>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
 
@@ -2940,27 +3141,63 @@ export default function AdminPanelV2() {
                       </div>
                     ) : null}
 
+                    {/* Search Input */}
+                    <div className="flex items-center gap-2" data-testid="admin-v2-apps-search">
+                      <div className="relative flex-1 max-w-[300px]">
+                        <Input
+                          type="text"
+                          placeholder="Search by name or email..."
+                          value={appSearch}
+                          onChange={(e) => {
+                            setAppSearch(e.target.value);
+                            setAppPagination((p) => ({ ...p, page: 1 }));
+                          }}
+                          className={appSearch ? "pr-8" : ""}
+                          data-testid="admin-v2-apps-search-input"
+                        />
+                        {appSearch && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0"
+                            onClick={() => {
+                              setAppSearch("");
+                              setAppPagination((p) => ({ ...p, page: 1 }));
+                            }}
+                            data-testid="admin-v2-apps-search-clear"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+
                     {appsState.rows.length === 0 ? (
                       <div className="text-sm text-slate-600" data-testid="admin-v2-apps-empty">
                         No applications yet.
                       </div>
+                    ) : filteredAndPaginatedApps.rows.length === 0 ? (
+                      <div className="text-sm text-slate-600" data-testid="admin-v2-apps-no-results">
+                        No applications found matching your search.
+                      </div>
                     ) : null}
 
-                    <div className="rounded-xl border border-slate-200/70 overflow-hidden" data-testid="admin-v2-apps-table-wrapper">
-                      <Table data-testid="admin-v2-apps-table">
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead data-testid="admin-v2-apps-th-name">Candidate</TableHead>
-                            <TableHead data-testid="admin-v2-apps-th-email">Email</TableHead>
-                            <TableHead data-testid="admin-v2-apps-th-job">Job</TableHead>
-                            <TableHead data-testid="admin-v2-apps-th-persona">Persona</TableHead>
-                            <TableHead data-testid="admin-v2-apps-th-xp">XP</TableHead>
-                            <TableHead data-testid="admin-v2-apps-th-created">Created</TableHead>
-                            <TableHead data-testid="admin-v2-apps-th-action" className="text-right">Action</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {appsState.rows.map((r) => (
+                    {filteredAndPaginatedApps.rows.length > 0 && (
+                      <div className="rounded-xl border border-slate-200/70 overflow-hidden" data-testid="admin-v2-apps-table-wrapper">
+                        <Table data-testid="admin-v2-apps-table">
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead data-testid="admin-v2-apps-th-name">Candidate</TableHead>
+                              <TableHead data-testid="admin-v2-apps-th-email">Email</TableHead>
+                              <TableHead data-testid="admin-v2-apps-th-job">Job</TableHead>
+                              <TableHead data-testid="admin-v2-apps-th-persona">Persona</TableHead>
+                              <TableHead data-testid="admin-v2-apps-th-xp">XP</TableHead>
+                              <TableHead data-testid="admin-v2-apps-th-created">Created</TableHead>
+                              <TableHead data-testid="admin-v2-apps-th-action" className="text-right">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {filteredAndPaginatedApps.rows.map((r) => (
                             <TableRow
                               key={r.id}
                               data-testid={`admin-v2-app-row-${r.id}`}
@@ -3111,6 +3348,89 @@ export default function AdminPanelV2() {
                         </TableBody>
                       </Table>
                     </div>
+                    )}
+                    
+                    {/* Pagination */}
+                    {filteredAndPaginatedApps.totalPages > 0 && (
+                      <div className="flex items-center justify-between mt-4 pt-4 border-t" data-testid="admin-v2-apps-pagination">
+                        <div className="text-sm text-slate-600" data-testid="admin-v2-apps-pagination-info">
+                          Showing {((appPagination.page - 1) * appPagination.page_size) + 1} to{" "}
+                          {Math.min(appPagination.page * appPagination.page_size, filteredAndPaginatedApps.totalCount)} of{" "}
+                          {filteredAndPaginatedApps.totalCount} applications
+                        </div>
+                        <Pagination>
+                          <PaginationContent>
+                            <PaginationItem>
+                              <PaginationPrevious
+                                href="#"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  if (filteredAndPaginatedApps.hasPrev) {
+                                    setAppPagination((p) => ({ ...p, page: p.page - 1 }));
+                                  }
+                                }}
+                                className={!filteredAndPaginatedApps.hasPrev ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                                data-testid="admin-v2-apps-pagination-prev"
+                              />
+                            </PaginationItem>
+                            
+                            {/* Page numbers */}
+                            {Array.from({ length: filteredAndPaginatedApps.totalPages }, (_, i) => i + 1).map((pageNum) => {
+                              // Show first page, last page, current page, and pages around current
+                              const showPage = 
+                                pageNum === 1 ||
+                                pageNum === filteredAndPaginatedApps.totalPages ||
+                                (pageNum >= appPagination.page - 1 && pageNum <= appPagination.page + 1);
+                              
+                              if (!showPage) {
+                                // Show ellipsis
+                                if (pageNum === appPagination.page - 2 || pageNum === appPagination.page + 2) {
+                                  return (
+                                    <PaginationItem key={pageNum}>
+                                      <PaginationEllipsis />
+                                    </PaginationItem>
+                                  );
+                                }
+                                return null;
+                              }
+                              
+                              return (
+                                <PaginationItem key={pageNum}>
+                                  <PaginationLink
+                                    href="#"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      if (pageNum !== appPagination.page) {
+                                        setAppPagination((p) => ({ ...p, page: pageNum }));
+                                      }
+                                    }}
+                                    isActive={pageNum === appPagination.page}
+                                    className="cursor-pointer"
+                                    data-testid={`admin-v2-apps-pagination-page-${pageNum}`}
+                                  >
+                                    {pageNum}
+                                  </PaginationLink>
+                                </PaginationItem>
+                              );
+                            })}
+                            
+                            <PaginationItem>
+                              <PaginationNext
+                                href="#"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  if (filteredAndPaginatedApps.hasNext) {
+                                    setAppPagination((p) => ({ ...p, page: p.page + 1 }));
+                                  }
+                                }}
+                                className={!filteredAndPaginatedApps.hasNext ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                                data-testid="admin-v2-apps-pagination-next"
+                              />
+                            </PaginationItem>
+                          </PaginationContent>
+                        </Pagination>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
 
