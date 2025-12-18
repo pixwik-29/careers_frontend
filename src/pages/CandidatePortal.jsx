@@ -85,13 +85,19 @@ export default function CandidatePortal() {
 
   const statusMessage = useMemo(() => {
     if (!candidate) return "";
-    if (candidate.status === "Rejected") return "Your application is no longer in process.";
+    if (candidate.status === "Rejected") return "Thank you for taking the time to attend the interview. After careful consideration, we regret to inform you that we will not be moving forward with your application at this time. We appreciate your interest and wish you the very best in your future endeavors.";
     if (candidate.status === "Selected") return "Congratulations — you’ve been selected!";
 
     if (round?.is_quiz) {
       if (candidate.quiz_status === "Completed") return "Quiz submitted. Please wait for evaluation.";
       if (candidate.quiz_status === "In Progress") return "Quiz is in progress. You can submit once.";
       return "This round includes an online quiz.";
+    }
+  
+    if (round?.is_coding) {
+      if (candidate.coding_status === "Completed") return "Coding task submitted. Please wait for evaluation.";
+      if (candidate.coding_status === "In Progress") return "Coding task is in progress. You can submit once.";
+      return "This round includes a coding task.";
     }
 
     return "Please wait for the next instruction. This round is evaluated offline.";
@@ -199,7 +205,7 @@ export default function CandidatePortal() {
 
               {candidate && round ? (
                 <>
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4" data-testid="candidate-portal-stats">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4" data-testid="candidate-portal-stats">
                     <Card className="quest-card" data-testid="candidate-portal-stat-job">
                       <CardHeader>
                         <CardDescription>Job applied</CardDescription>
@@ -221,7 +227,10 @@ export default function CandidatePortal() {
                         </CardTitle>
                       </CardHeader>
                     </Card>
-                    <Card className="quest-card" data-testid="candidate-portal-stat-status">
+              
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4" data-testid="candidate-portal-stats">
+                  <Card className="quest-card" data-testid="candidate-portal-stat-status">
                       <CardHeader>
                         <CardDescription>Status</CardDescription>
                         <CardTitle className="text-lg" data-testid="candidate-portal-status">
@@ -237,8 +246,7 @@ export default function CandidatePortal() {
                         </CardTitle>
                       </CardHeader>
                     </Card>
-                  </div>
-
+                    </div>
                   <Separator />
 
                   <div className="text-sm text-slate-700 whitespace-pre-wrap" data-testid="candidate-round-description">
@@ -264,13 +272,20 @@ export default function CandidatePortal() {
                     </Button>
                   ) : null}
 
-                  {round.is_quiz && candidate.quiz_status === "Completed" ? (
-                    <div className="text-sm text-slate-600" data-testid="candidate-quiz-locked">
-                      Quiz already submitted. You can’t resubmit.
-                    </div>
+                  {round.is_quiz && candidate.quiz_status === "Completed" && candidate.status !== 'Rejected' ? (
+                    candidate.quiz_submission_status === "Pass" ? (
+                      <div className="text-sm text-green-600 font-medium" data-testid="candidate-quiz-pass">
+                        🎉 Congratulations! You have passed the quiz. We'll be in touch soon.
+                      </div>
+                    ) : (
+                      <div className="text-sm text-slate-600" data-testid="candidate-quiz-fail">
+                        Thank you for attending the interview. We'll get back to you later.
+                      </div>
+                    )
                   ) : null}
 
-                  {round.is_coding && candidate.status === "Active" ? (
+                  {round.is_coding && candidate.status === "Pending" && candidate.quiz_status === "Completed" 
+                  && !candidate.coding_submitted_status? (
                     <Button
                       className="quest-primary"
                       data-testid="candidate-start-coding-button"

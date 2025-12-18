@@ -34,7 +34,7 @@
 
 .quest-container {
   position: relative;
-  max-width: 1120px;
+  max-width: 1280px;
   margin: 0 auto;
   padding: 86px 18px 48px;
 }
@@ -207,8 +207,9 @@
 }
 
 .quest-choice--active {
-  border-color: rgba(20, 184, 166, 0.55);
-  box-shadow: 0 20px 30px rgba(13, 148, 136, 0.12);
+  border-color: rgb(20 184 166);
+  box-shadow: 0 20px 30px rgb(13 148 136);
+  background: rgb(20 184 166 / 1%);
 }
 
 .quest-choice__key {
@@ -231,7 +232,20 @@
 .quest-error {
   margin-top: 6px;
   font-size: 0.9rem;
-  color: rgba(190, 18, 60, 0.95);
+  color: rgba(255, 0, 64, 0.95);
+}
+
+
+.quest-warning {
+  margin-top: 6px;
+  font-size: 1.5rem;
+  color: rgba(26, 40, 169, 0.95);
+  font-weight: 600;
+}
+
+
+.bg-black\/80 {
+  background-color: rgb(255 255 255);
 }
 
 .quest-hint {

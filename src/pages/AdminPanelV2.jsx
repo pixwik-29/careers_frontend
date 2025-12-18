@@ -23,6 +23,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Copy, Check, Play } from "lucide-react";
+import { json } from "monaco-editor";
 
 function formatDateTime(iso) {
   try {
@@ -146,6 +155,7 @@ export default function AdminPanelV2() {
   const [draft, setDraft] = useState(EMPTY_DRAFT);
 
   const [appsState, setAppsState] = useState({ status: "idle", error: null, rows: [], selected: null, csvUrl: null });
+  const [applicationDetailsOpen, setApplicationDetailsOpen] = useState(false);
   const [csvFilename, setCsvFilename] = useState("pixwik-applications.csv");
   const [candidatesCsvFilename, setCandidatesCsvFilename] = useState("pixwik-candidates.csv");
 
@@ -154,8 +164,13 @@ export default function AdminPanelV2() {
 
   const [candidatesState, setCandidatesState] = useState({ status: "idle", error: null, rows: [], selected: null, csvUrl: null });
   const [selectedCandidateIds, setSelectedCandidateIds] = useState([]);
+  const [evaluationModalOpen, setEvaluationModalOpen] = useState(false);
+  const [evaluationHistoryModalOpen, setEvaluationHistoryModalOpen] = useState(false);
+  const [selectedCandidateForHistory, setSelectedCandidateForHistory] = useState(null);
   const [roundsState, setRoundsState] = useState({ status: "idle", error: null, rows: [] });
   const [evalForm, setEvalForm] = useState({ score: 0, evaluator_name: "", comments: "", status: "Pass" });
+  const [evalTab, setEvalTab] = useState("evaluation"); // "evaluation" or "coding"
+  const [apiLoading, setApiLoading] = useState(false);
 
   const [quizState, setQuizState] = useState({ status: "idle", error: null, items: [], selected: null });
 
@@ -166,6 +181,24 @@ export default function AdminPanelV2() {
 
   const [codingState, setCodingState] = useState({ status: "idle", error: null, templates: [], problems: [], selectedProblemId: "" });
   const [codingDraft, setCodingDraft] = useState({ template_id: "", title_override: "" });
+  const [codingHistoryVisible, setCodingHistoryVisible] = useState(false);
+  const [codingHistoryState, setCodingHistoryState] = useState({ status: "idle", error: null, rows: [] });
+
+  // Submission history state
+  const [submissionHistory, setSubmissionHistory] = useState({ status: "idle", error: null, rows: [] });
+  const [codeViewerOpen, setCodeViewerOpen] = useState(false);
+  const [selectedSubmissionCode, setSelectedSubmissionCode] = useState("");
+  const [selectedSubmissionLanguage, setSelectedSubmissionLanguage] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  // Candidate coding viewer state
+  const [candidateCodingViewerOpen, setCandidateCodingViewerOpen] = useState(false);
+  const [candidateCodingData, setCandidateCodingData] = useState({ status: "idle", error: null, code: "", language: "", problem: null });
+  const [candidateCodingCopied, setCandidateCodingCopied] = useState(false);
+  const [candidateCodingRunState, setCandidateCodingRunState] = useState({ status: "idle", error: null, result: null });
+
+  // Quiz submission state
+  const [quizSubmissionData, setQuizSubmissionData] = useState({ status: "idle", error: null, data: null });
 
 
   const [adminRole, setAdminRole] = useState("unknown");
@@ -461,12 +494,21 @@ export default function AdminPanelV2() {
     setCandidatesState((s) => ({ ...s, selected: row }));
     setEvalForm({ score: 0, evaluator_name: "", comments: "", status: "Pass" });
     loadCandidateScores(row?.candidate_id);
+    loadQuizSubmission(row?.candidate_id);
+    setEvaluationModalOpen(true);
+  }
+
+  function openEvaluationHistory(candidate) {
+    setSelectedCandidateForHistory(candidate);
+    loadCandidateScores(candidate?.candidate_id);
+    setEvaluationHistoryModalOpen(true);
   }
 
   async function submitEvaluation() {
     const candidate = candidatesState.selected;
     if (!candidate) return;
 
+    setApiLoading(true);
     try {
       await axios.post(
         `${API}/admin/candidates/${candidate.candidate_id}/score`,
@@ -481,9 +523,20 @@ export default function AdminPanelV2() {
       );
       await loadCandidates();
       toast({ title: "Score saved", description: `${candidate.full_name} – ${candidate.current_round} – ${Number(evalForm.score)} pts` });
+      setEvaluationModalOpen(false);
+      setCandidatesState((s) => ({ ...s, selected: null }));
+      setScoresState((st) => ({ ...st, rows: [] }));
+      setEvalTab("evaluation");
     } catch (e) {
       const msg = extractErrorMessage(e, "Failed to submit score");
       setCandidatesState((s) => ({ ...s, error: msg }));
+      toast({
+        title: "Failed to submit score",
+        description: msg,
+        variant: "destructive",
+      });
+    } finally {
+      setApiLoading(false);
     }
   }
 
@@ -491,14 +544,29 @@ export default function AdminPanelV2() {
     const candidate = candidatesState.selected;
     if (!candidate) return;
 
+    setApiLoading(true);
     try {
       await axios.post(`${API}/admin/candidates/${candidate.candidate_id}/promote`, {}, getAxiosConfig({ headers: { Authorization: `Bearer ${token}` } }));
       await loadCandidates();
+      toast({
+        title: "Candidate promoted",
+        description: `${candidate.full_name} has been promoted to the next round`
+      });
+      setEvaluationModalOpen(false);
       setCandidatesState((s) => ({ ...s, selected: null }));
+      setScoresState((st) => ({ ...st, rows: [] }));
+      setEvalTab("evaluation");
       setSelectedCandidateIds((prev) => prev.filter((id) => id !== candidate.candidate_id));
     } catch (e) {
       const msg = extractErrorMessage(e, "Failed to promote");
       setCandidatesState((s) => ({ ...s, error: msg }));
+      toast({
+        title: "Failed to promote",
+        description: msg,
+        variant: "destructive",
+      });
+    } finally {
+      setApiLoading(false);
     }
   }
 
@@ -526,6 +594,7 @@ export default function AdminPanelV2() {
 
     // Optimistic clear so the UI immediately reflects the action.
     setSelectedCandidateIds([]);
+    setApiLoading(true);
 
     try {
       await axios.post(
@@ -535,11 +604,19 @@ export default function AdminPanelV2() {
       );
       await loadCandidates();
       setCandidatesState((s) => ({ ...s, selected: null }));
+      toast({ title: "Candidates promoted", description: `${ids.length} candidate(s) promoted` });
     } catch (e) {
       // Restore selection on failure
       setSelectedCandidateIds(ids);
       const msg = extractErrorMessage(e, "Failed to bulk promote");
       setCandidatesState((s) => ({ ...s, error: msg }));
+      toast({
+        title: "Failed to promote",
+        description: msg,
+        variant: "destructive",
+      });
+    } finally {
+      setApiLoading(false);
     }
   }
 
@@ -551,6 +628,7 @@ export default function AdminPanelV2() {
     if (!ok) return;
 
     setSelectedCandidateIds([]);
+    setApiLoading(true);
 
     try {
       await axios.post(
@@ -565,6 +643,13 @@ export default function AdminPanelV2() {
       setSelectedCandidateIds(ids);
       const msg = extractErrorMessage(e, "Failed to delete candidates");
       setCandidatesState((s) => ({ ...s, error: msg }));
+      toast({
+        title: "Failed to delete",
+        description: msg,
+        variant: "destructive",
+      });
+    } finally {
+      setApiLoading(false);
     }
   }
 
@@ -576,6 +661,7 @@ export default function AdminPanelV2() {
     if (!ok) return;
 
     setSelectedCandidateIds([]);
+    setApiLoading(true);
 
     try {
       await axios.post(
@@ -590,6 +676,13 @@ export default function AdminPanelV2() {
       setSelectedCandidateIds(ids);
       const msg = extractErrorMessage(e, "Failed to bulk reject");
       setCandidatesState((s) => ({ ...s, error: msg }));
+      toast({
+        title: "Failed to reject",
+        description: msg,
+        variant: "destructive",
+      });
+    } finally {
+      setApiLoading(false);
     }
   }
 
@@ -602,6 +695,7 @@ export default function AdminPanelV2() {
     if (!ok) return;
 
     setSelectedCandidateIds([]);
+    setApiLoading(true);
 
     try {
       await axios.post(
@@ -616,6 +710,13 @@ export default function AdminPanelV2() {
       setSelectedCandidateIds(ids);
       const msg = extractErrorMessage(e, "Failed to bulk finalize");
       setCandidatesState((s) => ({ ...s, error: msg }));
+      toast({
+        title: "Failed to update",
+        description: msg,
+        variant: "destructive",
+      });
+    } finally {
+      setApiLoading(false);
     }
   }
 
@@ -623,6 +724,7 @@ export default function AdminPanelV2() {
     const candidate = candidatesState.selected;
     if (!candidate) return;
 
+    setApiLoading(true);
     try {
       await axios.post(
         `${API}/admin/candidates/${candidate.candidate_id}/finalize`,
@@ -631,11 +733,21 @@ export default function AdminPanelV2() {
       );
       await loadCandidates();
       toast({ title: "Candidate updated", description: `${candidate.full_name} – ${decision}` });
+      setEvaluationModalOpen(false);
       setCandidatesState((s) => ({ ...s, selected: null }));
+      setScoresState((st) => ({ ...st, rows: [] }));
+      setEvalTab("evaluation");
       setSelectedCandidateIds((prev) => prev.filter((id) => id !== candidate.candidate_id));
     } catch (e) {
       const msg = extractErrorMessage(e, "Failed to update candidate");
       setCandidatesState((s) => ({ ...s, error: msg }));
+      toast({
+        title: "Failed to update candidate",
+        description: msg,
+        variant: "destructive",
+      });
+    } finally {
+      setApiLoading(false);
     }
   }
 
@@ -645,12 +757,29 @@ export default function AdminPanelV2() {
     const ok = window.confirm("Reject this candidate?");
     if (!ok) return;
 
+    setApiLoading(true);
     try {
       await axios.post(`${API}/admin/candidates/${candidate.candidate_id}/reject`, {}, getAxiosConfig({ headers: { Authorization: `Bearer ${token}` } }));
       await loadCandidates();
+      toast({
+        title: "Candidate rejected",
+        description: `${candidate.full_name} has been rejected`
+      });
+      setEvaluationModalOpen(false);
+      setCandidatesState((s) => ({ ...s, selected: null }));
+      setScoresState((st) => ({ ...st, rows: [] }));
+      setEvalTab("evaluation");
+      setSelectedCandidateIds((prev) => prev.filter((id) => id !== candidate.candidate_id));
     } catch (e) {
       const msg = extractErrorMessage(e, "Failed to reject");
       setCandidatesState((s) => ({ ...s, error: msg }));
+      toast({
+        title: "Failed to reject",
+        description: msg,
+        variant: "destructive",
+      });
+    } finally {
+      setApiLoading(false);
     }
   }
 
@@ -792,6 +921,7 @@ export default function AdminPanelV2() {
     try {
       const res = await axios.get(`${API}/admin/applications/${id}`, getAxiosConfig({ headers: { Authorization: `Bearer ${token}` } }));
       setAppsState((s) => ({ ...s, status: "idle", selected: res.data, error: null }));
+      setApplicationDetailsOpen(true);
     } catch (e) {
       const msg = extractErrorMessage(e, "Failed to open application");
       setAppsState((s) => ({ ...s, status: "error", error: msg }));
@@ -891,6 +1021,260 @@ export default function AdminPanelV2() {
     }
   }
 
+  async function assignRandomCodingProblem() {
+    setCodingState((s) => ({ ...s, status: "loading", error: null }));
+    try {
+      const res = await axios.post(
+        `${API}/admin/coding/assign-random-problem`,
+        {},
+        getAxiosConfig({ headers: { Authorization: `Bearer ${token}` } }),
+      );
+      await loadRounds();
+      await loadCoding();
+      toast({
+        title: "Random coding problem assigned",
+        description: res.data?.message || "A random coding problem has been assigned successfully.",
+      });
+      setCodingState((s) => ({ ...s, status: "idle", error: null }));
+    } catch (e) {
+      const msg = extractErrorMessage(e, "Failed to assign random coding problem");
+      setCodingState((s) => ({ ...s, status: "error", error: msg }));
+      toast({
+        title: "Assignment failed",
+        description: msg,
+        variant: "destructive",
+      });
+    }
+  }
+
+  async function revokeAllCodingAssignments() {
+    setCodingState((s) => ({ ...s, status: "loading", error: null }));
+    try {
+      const res = await axios.post(
+        `${API}/admin/coding/remove-all-assignments`,
+        {},
+        getAxiosConfig({ headers: { Authorization: `Bearer ${token}` } }),
+      );
+      await loadRounds();
+      await loadCoding();
+      toast({
+        title: "All assignments revoked",
+        description: res.data?.message || "All coding problem assignments have been removed successfully.",
+      });
+      setCodingState((s) => ({ ...s, status: "idle", error: null }));
+    } catch (e) {
+      const msg = extractErrorMessage(e, "Failed to revoke coding assignments");
+      setCodingState((s) => ({ ...s, status: "error", error: msg }));
+      toast({
+        title: "Revocation failed",
+        description: msg,
+        variant: "destructive",
+      });
+    }
+  }
+
+  async function loadCodingHistory() {
+    setCodingHistoryState((s) => ({ ...s, status: "loading", error: null }));
+    try {
+      const res = await axios.get(
+        `${API}/admin/coding/candidate-assignments`,
+        getAxiosConfig({ headers: { Authorization: `Bearer ${token}` } }),
+      );
+      setCodingHistoryState({ status: "idle", error: null, rows: res.data?.items || res.data || [] });
+      setCodingHistoryVisible(true);
+    } catch (e) {
+      const msg = extractErrorMessage(e, "Failed to load coding history");
+      setCodingHistoryState((s) => ({ ...s, status: "error", error: msg, rows: [] }));
+      toast({
+        title: "Failed to load history",
+        description: msg,
+        variant: "destructive",
+      });
+    }
+  }
+
+  function toggleCodingHistory() {
+    if (!codingHistoryVisible) {
+      loadCodingHistory();
+    } else {
+      setCodingHistoryVisible(false);
+    }
+  }
+
+  async function loadSubmissionHistory() {
+    setSubmissionHistory({ status: "loading", error: null, rows: [] });
+    try {
+      const res = await axios.get(
+        `${API}/admin/coding/submissions`,
+        getAxiosConfig({ headers: { Authorization: `Bearer ${token}` } }),
+      );
+      setSubmissionHistory({ status: "ready", error: null, rows: res.data || [] });
+    } catch (e) {
+      const msg = extractErrorMessage(e, "Failed to load submission history");
+      setSubmissionHistory({ status: "error", error: msg, rows: [] });
+    }
+  }
+
+  function openCodeViewer(code, language) {
+    setSelectedSubmissionCode(code || "");
+    setSelectedSubmissionLanguage(language || "");
+    setCodeViewerOpen(true);
+    setCopied(false);
+  }
+
+  async function copyToClipboard() {
+    try {
+      await navigator.clipboard.writeText(selectedSubmissionCode);
+      setCopied(true);
+      toast({
+        title: "Copied!",
+        description: "Code copied to clipboard",
+      });
+      setTimeout(() => setCopied(false), 2000);
+    } catch (e) {
+      toast({
+        title: "Copy failed",
+        description: "Failed to copy code to clipboard",
+        variant: "destructive",
+      });
+    }
+  }
+
+  async function openCoding(candidate) {
+    if (!candidate?.candidate_id) return;
+
+    setEvalTab("coding");
+    setCandidateCodingData({ status: "loading", error: null, code: "", language: "", problem: null });
+    setCandidateCodingCopied(false);
+    setCandidateCodingRunState({ status: "idle", error: null, result: null });
+
+    try {
+      const res = await axios.get(
+        `${API}/admin/coding/submissions/${candidate.candidate_id}`,
+        getAxiosConfig({ headers: { Authorization: `Bearer ${token}` } }),
+      );
+      setCandidateCodingData({
+        status: "ready",
+        error: null,
+        code: res.data?.code || res.data?.submitted_code || "",
+        language: res.data?.language || "",
+        problem: res.data?.problem || null,
+      });
+    } catch (e) {
+      const msg = extractErrorMessage(e, "Failed to load coding submission");
+      setCandidateCodingData({ status: "error", error: msg, code: "", language: "", problem: null });
+      toast({
+        title: "Failed to load submission",
+        description: msg,
+        variant: "destructive",
+      });
+    }
+  }
+
+  // Load coding data when coding tab is opened
+  useEffect(() => {
+    if (evalTab === "coding" && candidatesState.selected?.candidate_id && candidateCodingData.status !== "loading" && !candidateCodingData.code) {
+      const candidate = candidatesState.selected;
+      if (!candidate?.candidate_id) return;
+
+      setCandidateCodingData({ status: "loading", error: null, code: "", language: "", problem: null });
+      setCandidateCodingCopied(false);
+      setCandidateCodingRunState({ status: "idle", error: null, result: null });
+
+      axios.get(
+        `${API}/admin/coding/submissions/${candidate.candidate_id}`,
+        getAxiosConfig({ headers: { Authorization: `Bearer ${token}` } }),
+      ).then((res) => {
+        setCandidateCodingData({
+          status: "ready",
+          error: null,
+          code: res.data?.code || res.data?.submitted_code || "",
+          language: res.data?.language || "",
+          problem: res.data?.problem || null,
+        });
+      }).catch((e) => {
+        const msg = extractErrorMessage(e, "Failed to load coding submission");
+        setCandidateCodingData({ status: "error", error: msg, code: "", language: "", problem: null });
+        toast({
+          title: "Failed to load submission",
+          description: msg,
+          variant: "destructive",
+        });
+      });
+    }
+  }, [evalTab, candidatesState.selected?.candidate_id]);
+
+  async function loadQuizSubmission(candidateId) {
+    if (!candidateId) return;
+
+    setQuizSubmissionData({ status: "loading", error: null, data: null });
+    try {
+      const res = await axios.get(
+        `${API}/admin/quiz/submissions/${candidateId}`,
+        getAxiosConfig({ headers: { Authorization: `Bearer ${token}` } }),
+      );
+      setQuizSubmissionData({
+        status: "ready",
+        error: null,
+        data: res.data || null,
+      });
+    } catch (e) {
+      const msg = extractErrorMessage(e, "Failed to load quiz submission");
+      setQuizSubmissionData({ status: "error", error: msg, data: null });
+    }
+  }
+
+  async function copyCandidateCodingToClipboard() {
+    try {
+      await navigator.clipboard.writeText(candidateCodingData.code);
+      setCandidateCodingCopied(true);
+      toast({
+        title: "Copied!",
+        description: "Code copied to clipboard",
+      });
+      setTimeout(() => setCandidateCodingCopied(false), 2000);
+    } catch (e) {
+      toast({
+        title: "Copy failed",
+        description: "Failed to copy code to clipboard",
+        variant: "destructive",
+      });
+    }
+  }
+
+  async function runCandidateCoding() {
+    if (!candidateCodingData.code || !candidateCodingData.language) {
+      toast({
+        title: "Cannot run",
+        description: "Code or language is missing",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setCandidateCodingRunState({ status: "loading", error: null, result: null });
+    try {
+      const res = await axios.post(
+        `${API}/candidate/coding/run`,
+        { language: candidateCodingData.language, code: candidateCodingData.code },
+        getAxiosConfig({ headers: { Authorization: `Bearer ${token}` } }),
+      );
+      setCandidateCodingRunState({ status: "ready", error: null, result: res.data });
+      toast({
+        title: "Code executed",
+        description: `Passed ${res.data?.passed || 0}/${res.data?.total || 0} tests`,
+      });
+    } catch (e) {
+      const msg = extractErrorMessage(e, "Failed to run code");
+      setCandidateCodingRunState({ status: "error", error: msg, result: null });
+      toast({
+        title: "Run failed",
+        description: msg,
+        variant: "destructive",
+      });
+    }
+  }
+
   async function disableCodingForRound(roundId) {
     setCodingState((s) => ({ ...s, status: "loading", error: null }));
     try {
@@ -939,6 +1323,16 @@ export default function AdminPanelV2() {
 
   return (
     <div className="quest-page" data-testid="admin-v2-page">
+      {apiLoading && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" data-testid="admin-v2-api-loader">
+          <div className="bg-white rounded-lg p-6 shadow-xl">
+            <div className="flex flex-col items-center gap-4">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+              <p className="text-sm font-medium text-slate-900">Processing...</p>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="quest-backdrop" aria-hidden="true" data-testid="admin-v2-backdrop" />
 
       <a
@@ -1339,67 +1733,67 @@ export default function AdminPanelV2() {
                         </CardDescription>
                       </div>
 
-                    <div className="flex flex-wrap items-center gap-2" data-testid="admin-v2-candidates-filters">
-                      <div className="min-w-[260px]" data-testid="admin-v2-candidates-job-filter">
-                        <Select value={candidateJobFilter} onValueChange={(v) => setCandidateJobFilter(v)}>
-                          <SelectTrigger data-testid="admin-v2-candidates-job-filter-trigger">
-                            <SelectValue placeholder="Filter by job" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All jobs</SelectItem>
-                            {jobsState.rows
-                              .filter((j) => j.slug)
-                              .map((j) => (
-                                <SelectItem key={j.id} value={j.slug}>
-                                  {j.title}
+                      <div className="flex flex-wrap items-center gap-2" data-testid="admin-v2-candidates-filters">
+                        <div className="min-w-[260px]" data-testid="admin-v2-candidates-job-filter">
+                          <Select value={candidateJobFilter} onValueChange={(v) => setCandidateJobFilter(v)}>
+                            <SelectTrigger data-testid="admin-v2-candidates-job-filter-trigger">
+                              <SelectValue placeholder="Filter by job" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All jobs</SelectItem>
+                              {jobsState.rows
+                                .filter((j) => j.slug)
+                                .map((j) => (
+                                  <SelectItem key={j.id} value={j.slug}>
+                                    {j.title}
+                                  </SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="min-w-[200px]" data-testid="admin-v2-candidates-status-filter">
+                          <Select value={candidateStatusFilter} onValueChange={(v) => setCandidateStatusFilter(v)}>
+                            <SelectTrigger data-testid="admin-v2-candidates-status-filter-trigger">
+                              <SelectValue placeholder="Filter by status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All statuses</SelectItem>
+                              <SelectItem value="Active">Active</SelectItem>
+                              <SelectItem value="Rejected">Rejected</SelectItem>
+                              <SelectItem value="Selected">Selected</SelectItem>
+                              <SelectItem value="Completed (not selected)">Completed (not selected)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="min-w-[260px]" data-testid="admin-v2-candidates-round-filter">
+                          <Select value={candidateRoundFilter} onValueChange={(v) => setCandidateRoundFilter(v)}>
+                            <SelectTrigger data-testid="admin-v2-candidates-round-filter-trigger">
+                              <SelectValue placeholder="Filter by round" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All rounds</SelectItem>
+                              {roundsState.rows.map((r) => (
+                                <SelectItem key={r.round_id} value={r.round_name}>
+                                  {r.round_name}
                                 </SelectItem>
                               ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
+                            </SelectContent>
+                          </Select>
+                        </div>
 
-                      <div className="min-w-[200px]" data-testid="admin-v2-candidates-status-filter">
-                        <Select value={candidateStatusFilter} onValueChange={(v) => setCandidateStatusFilter(v)}>
-                          <SelectTrigger data-testid="admin-v2-candidates-status-filter-trigger">
-                            <SelectValue placeholder="Filter by status" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All statuses</SelectItem>
-                            <SelectItem value="Active">Active</SelectItem>
-                            <SelectItem value="Rejected">Rejected</SelectItem>
-                            <SelectItem value="Selected">Selected</SelectItem>
-                            <SelectItem value="Completed (not selected)">Completed (not selected)</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <Button
+                          variant="secondary"
+                          data-testid="admin-v2-candidates-apply-filter"
+                          onClick={() => {
+                            setSelectedCandidateIds([]);
+                            loadCandidates();
+                          }}
+                        >
+                          Apply
+                        </Button>
                       </div>
-
-                      <div className="min-w-[260px]" data-testid="admin-v2-candidates-round-filter">
-                        <Select value={candidateRoundFilter} onValueChange={(v) => setCandidateRoundFilter(v)}>
-                          <SelectTrigger data-testid="admin-v2-candidates-round-filter-trigger">
-                            <SelectValue placeholder="Filter by round" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All rounds</SelectItem>
-                            {roundsState.rows.map((r) => (
-                              <SelectItem key={r.round_id} value={r.round_name}>
-                                {r.round_name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <Button
-                        variant="secondary"
-                        data-testid="admin-v2-candidates-apply-filter"
-                        onClick={() => {
-                          setSelectedCandidateIds([]);
-                          loadCandidates();
-                        }}
-                      >
-                        Apply
-                      </Button>
-                    </div>
 
                       <div className="flex items-center gap-2" data-testid="admin-v2-candidates-actions">
                         {selectedCandidateIds.length > 0 ? (
@@ -1533,6 +1927,7 @@ export default function AdminPanelV2() {
                                   {c.status}
                                 </Badge>
                               </TableCell>
+                              {c.is_coding}
                               <TableCell data-testid={`admin-v2-cand-coding-${c.candidate_id}`}>
                                 {c.is_coding ? (
                                   <Badge variant="secondary" data-testid={`admin-v2-cand-coding-badge-${c.candidate_id}`}>
@@ -1543,9 +1938,14 @@ export default function AdminPanelV2() {
                                 )}
                               </TableCell>
                               <TableCell className="text-right" data-testid={`admin-v2-cand-action-${c.candidate_id}`}>
-                                <Button size="sm" variant="secondary" data-testid={`admin-v2-cand-evaluate-${c.candidate_id}`} onClick={() => selectCandidate(c)}>
-                                  Evaluate
-                                </Button>
+                                <div className="flex items-center justify-end gap-2">
+                                  <Button size="sm" variant="secondary" data-testid={`admin-v2-cand-evaluate-${c.candidate_id}`} onClick={(e) => { e.stopPropagation(); selectCandidate(c); }}>
+                                    Evaluate
+                                  </Button>
+                                  <Button size="sm" variant="secondary" data-testid={`admin-v2-cand-history-${c.candidate_id}`} onClick={(e) => { e.stopPropagation(); openEvaluationHistory(c); }}>
+                                    History
+                                  </Button>
+                                </div>
                               </TableCell>
                             </TableRow>
                           ))}
@@ -1555,175 +1955,309 @@ export default function AdminPanelV2() {
                   </CardContent>
                 </Card>
 
-                {candidatesState.selected ? (
-                <Card className="quest-card w-2/5" data-testid="admin-v2-eval-card">
-                  <CardHeader>
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-
-
-                        <CardTitle data-testid="admin-v2-eval-title">Evaluation</CardTitle>
-                        <CardDescription data-testid="admin-v2-eval-desc">
-                          Score the selected candidate for their current round.
-                        </CardDescription>
+                <Dialog open={evaluationModalOpen && !!candidatesState.selected} onOpenChange={(open) => {
+                  if (!open) {
+                    setEvaluationModalOpen(false);
+                    setCandidatesState((s) => ({ ...s, selected: null }));
+                    setScoresState((st) => ({ ...st, rows: [] }));
+                  }
+                }}>
+                  <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto" data-testid="admin-v2-eval-dialog" onInteractOutside={(e) => e.preventDefault()}>
+                    <DialogHeader>
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <DialogTitle data-testid="admin-v2-eval-title">Evaluation</DialogTitle>
+                          <DialogDescription data-testid="admin-v2-eval-desc">
+                            Score the selected candidate for their current round.
+                          </DialogDescription>
+                        </div>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          data-testid="admin-v2-eval-close"
+                          onClick={() => {
+                            setEvaluationModalOpen(false);
+                            setCandidatesState((s) => ({ ...s, selected: null }));
+                            setScoresState((st) => ({ ...st, rows: [] }));
+                            setEvalTab("evaluation");
+                          }}
+                        >
+                          Close
+                        </Button>
                       </div>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        data-testid="admin-v2-eval-close"
-                        onClick={() => {
-                          setCandidatesState((s) => ({ ...s, selected: null }));
-                          setScoresState((st) => ({ ...st, rows: [] }));
-                        }}
-                      >
-                        Close
-                      </Button>
-                    </div>
-                  </CardHeader>
+                    </DialogHeader>
+                    {candidatesState.selected ? (
+                      <Tabs value={evalTab} onValueChange={setEvalTab} className="mt-4" data-testid="admin-v2-eval-tabs">
+                        <TabsList data-testid="admin-v2-eval-tabs-list">
+                          <TabsTrigger value="evaluation" data-testid="admin-v2-eval-tab-evaluation">
+                            Evaluation
+                          </TabsTrigger>
+                          {candidatesState.selected?.is_coding && (
+                            <TabsTrigger value="coding" data-testid="admin-v2-eval-tab-coding">
+                              Coding
+                            </TabsTrigger>
+                          )}
+                        </TabsList>
 
-
-                  <CardContent className="space-y-4">
-                      <div className="space-y-4" data-testid="admin-v2-eval-form">
-                        <div className="flex flex-wrap items-center gap-2" data-testid="admin-v2-eval-badges">
-                          <Badge className="quest-badge" data-testid="admin-v2-eval-candidate-name">
-                            {candidatesState.selected.full_name}
-                          </Badge>
-                          <Badge variant="secondary" data-testid="admin-v2-eval-round">
-                            {candidatesState.selected.current_round}
-                          </Badge>
-                        </div>
-
-                        <Separator />
-
-                        <div className="space-y-2" data-testid="admin-v2-eval-score">
-                          <Label>Score</Label>
-                          <Input
-                            type="number"
-                            value={evalForm.score}
-                            data-testid="admin-v2-eval-score-input"
-                            onChange={(e) => setEvalForm((s) => ({ ...s, score: e.target.value }))}
-                            placeholder="0"
-                          />
-                          <div className="text-xs text-slate-500" data-testid="admin-v2-eval-max">
-                            Max score depends on the round (R1=20, R2=30, R3=30, R4=20). Round names are: Communication & Creativity, Problem-solving, Technical collaboration, Attitude & Culture fit.
+                        <TabsContent value="evaluation" className="space-y-4" data-testid="admin-v2-eval-tab-evaluation-content">
+                          <div className="flex flex-wrap items-center gap-2" data-testid="admin-v2-eval-badges">
+                            <Badge className="quest-badge" data-testid="admin-v2-eval-candidate-name">
+                              {candidatesState.selected?.full_name || ""}
+                            </Badge>
+                            <Badge variant="secondary" data-testid="admin-v2-eval-round">
+                              {candidatesState.selected?.current_round || ""}
+                            </Badge>
                           </div>
-                        </div>
 
-                        <div className="space-y-2" data-testid="admin-v2-eval-evaluator">
-                          <Label>Evaluator name</Label>
-                          <Input
-                            value={evalForm.evaluator_name}
-                            data-testid="admin-v2-eval-evaluator-input"
-                            onChange={(e) => setEvalForm((s) => ({ ...s, evaluator_name: e.target.value }))}
-                            placeholder="Your name"
-                          />
-                        </div>
+                          <Separator />
 
-                        <div className="space-y-2" data-testid="admin-v2-eval-comments">
-                          <Label>Comments</Label>
-                          <Textarea
-                            value={evalForm.comments}
-                            data-testid="admin-v2-eval-comments-input"
-                            onChange={(e) => setEvalForm((s) => ({ ...s, comments: e.target.value }))}
-                            className="min-h-[110px]"
-                            placeholder="Notes for internal review"
-                          />
-                        </div>
 
-                        <div className="space-y-2" data-testid="admin-v2-eval-status">
-                          <Label>Result</Label>
-                          <Select value={evalForm.status} onValueChange={(v) => setEvalForm((s) => ({ ...s, status: v }))}>
-                            <SelectTrigger data-testid="admin-v2-eval-status-select">
-                              <SelectValue placeholder="Select result" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Pass" data-testid="admin-v2-eval-pass">Pass</SelectItem>
-                              <SelectItem value="Fail" data-testid="admin-v2-eval-fail">Fail</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
+                          <div className="space-y-2" data-testid="admin-v2-eval-score">
+                            <Label>Score</Label>
+                            <Input
+                              type="number"
+                              value={evalForm.score}
+                              data-testid="admin-v2-eval-score-input"
+                              onChange={(e) => setEvalForm((s) => ({ ...s, score: e.target.value }))}
+                              placeholder="0"
+                            />
+                            <div className="text-xs text-slate-500" data-testid="admin-v2-eval-max">
+                              Max score depends on the round (R1=20, R2=30, R3=30, R4=20). Round names are: Communication & Creativity, Problem-solving, Technical collaboration, Attitude & Culture fit.
+                            </div>
 
-                        <div className="flex flex-wrap items-center gap-2" data-testid="admin-v2-eval-actions">
-                          <Button className="quest-primary" data-testid="admin-v2-eval-submit" onClick={submitEvaluation}>
-                            Submit score
-                          </Button>
+                            <div className="space-y-2">
+                              {quizSubmissionData.status === "loading" ? (
+                                <div className="text-xs text-slate-500">Loading quiz data...</div>
+                              ) : quizSubmissionData.error ? (
+                                <div className="text-xs text-red-600">{extractErrorMessage(quizSubmissionData.error)}</div>
+                              ) : quizSubmissionData.data ? (
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <Badge variant="secondary">
+                                    Questions: {quizSubmissionData.data.selected_answers ? Object.keys(quizSubmissionData.data.selected_answers).length : 0}
+                                  </Badge>
+                                  <Badge variant="secondary">
+                                    Score: {quizSubmissionData.data.score || 0}
+                                  </Badge>
+                                  <Badge
+                                    variant="default"
+                                    className={quizSubmissionData.data.status === "Pass" ? "bg-green-500 hover:bg-green-600 text-white" : "bg-red-500 hover:bg-red-600 text-white"}
+                                  >
+                                    Status: {quizSubmissionData.data.status || "N/A"}
+                                  </Badge>
+                                  {quizSubmissionData.data.comment && (
+                                    <Badge variant="secondary">
+                                      Comment: {quizSubmissionData.data.comment}
+                                    </Badge>
+                                  )}
+                                </div>
+                              ) : (
+                                <Badge variant="secondary">Quiz Not Completed</Badge>
+                              )}
+                            </div>
+                          </div>
 
-                          <Button variant="secondary" data-testid="admin-v2-eval-promote" onClick={promoteCandidate}>
-                            Promote to Next Round
-                          </Button>
+                          <div className="space-y-2" data-testid="admin-v2-eval-evaluator">
+                            <Label>Evaluator name</Label>
+                            <Input
+                              value={evalForm.evaluator_name}
+                              data-testid="admin-v2-eval-evaluator-input"
+                              onChange={(e) => setEvalForm((s) => ({ ...s, evaluator_name: e.target.value }))}
+                              placeholder="Your name"
+                            />
+                          </div>
 
-                          <Button variant="secondary" data-testid="admin-v2-eval-reject" onClick={rejectCandidate}>
-                            Reject
-                          </Button>
+                          <div className="space-y-2" data-testid="admin-v2-eval-comments">
+                            <Label>Comments</Label>
+                            <Textarea
+                              value={evalForm.comments}
+                              data-testid="admin-v2-eval-comments-input"
+                              onChange={(e) => setEvalForm((s) => ({ ...s, comments: e.target.value }))}
+                              className="min-h-[110px]"
+                              placeholder="Notes for internal review"
+                            />
+                          </div>
 
-                          <Button variant="secondary" data-testid="admin-v2-eval-final-select" onClick={() => finalizeCandidate("Selected")}>
-                            Mark Selected
-                          </Button>
+                          <div className="space-y-2" data-testid="admin-v2-eval-status">
+                            <Label>Result</Label>
+                            <Select value={evalForm.status} onValueChange={(v) => setEvalForm((s) => ({ ...s, status: v }))}>
+                              <SelectTrigger data-testid="admin-v2-eval-status-select">
+                                <SelectValue placeholder="Select result" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Pass" data-testid="admin-v2-eval-pass">Pass</SelectItem>
+                                <SelectItem value="Fail" data-testid="admin-v2-eval-fail">Fail</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
 
-                          <Button variant="secondary" data-testid="admin-v2-eval-final-deselect" onClick={() => finalizeCandidate("Completed")}>
-                            De-select (Completed)
-                          </Button>
-                        </div>
+                          <div className="flex flex-wrap items-center gap-2" data-testid="admin-v2-eval-actions">
+                            <Button className="quest-primary" data-testid="admin-v2-eval-submit" onClick={submitEvaluation}>
+                              Submit score
+                            </Button>
 
-                        <div className="text-xs text-slate-500" data-testid="admin-v2-eval-email-note">
-                          Promotion/rejection emails are sent automatically.
-                        </div>
+                            <Button variant="secondary" data-testid="admin-v2-eval-promote" onClick={promoteCandidate}>
+                              Promote to Next Round
+                            </Button>
 
-                        <Separator />
+                            <Button variant="secondary" data-testid="admin-v2-eval-reject" onClick={rejectCandidate}>
+                              Reject
+                            </Button>
 
-                        <div className="space-y-2" data-testid="admin-v2-eval-history">
-                          <div className="flex items-center justify-between">
-                            <div className="text-sm font-medium text-slate-900">Evaluation history</div>
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              data-testid="admin-v2-eval-history-refresh"
-                              onClick={() => loadCandidateScores(candidatesState.selected?.candidate_id)}
-                            >
-                              Refresh
+                            <Button variant="secondary" data-testid="admin-v2-eval-final-select" onClick={() => finalizeCandidate("Selected")}>
+                              Mark Selected
+                            </Button>
+
+                            <Button variant="secondary" data-testid="admin-v2-eval-final-deselect" onClick={() => finalizeCandidate("Completed")}>
+                              De-select (Completed)
                             </Button>
                           </div>
 
-                          {scoresState.error ? <div className="quest-error">{extractErrorMessage(scoresState.error)}</div> : null}
-
-                          <div className="rounded-xl border border-slate-200/70 overflow-hidden">
-                            <Table>
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead>Round</TableHead>
-                                  <TableHead>Score</TableHead>
-                                  <TableHead>Status</TableHead>
-                                  <TableHead>Evaluated by</TableHead>
-                                  <TableHead>Updated</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {scoresState.rows.map((s) => (
-                                  <TableRow key={s.score_id}>
-                                    <TableCell className="text-slate-900">{s.round_name}</TableCell>
-                                    <TableCell>
-                                      <Badge variant="secondary">{s.score}</Badge>
-                                    </TableCell>
-                                    <TableCell>
-                                      <Badge variant="secondary">{s.status}</Badge>
-                                    </TableCell>
-                                    <TableCell className="text-slate-700">{s.evaluator_name || "—"}</TableCell>
-                                    <TableCell className="text-slate-700">{formatDateTime(s.updated_at)}</TableCell>
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
+                          <div className="text-xs text-slate-500" data-testid="admin-v2-eval-email-note">
+                            Promotion/rejection emails are sent automatically.
                           </div>
+                        </TabsContent>
 
-                          {scoresState.status === "loading" ? <div className="text-xs text-slate-500">Loading…</div> : null}
-                          {scoresState.rows.length === 0 && scoresState.status !== "loading" ? (
-                            <div className="text-xs text-slate-500">No evaluations yet.</div>
-                          ) : null}
+                        {candidatesState.selected?.is_coding && (
+                          <TabsContent value="coding" className="space-y-4" data-testid="admin-v2-eval-tab-coding-content">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <h3 className="font-semibold text-slate-900">Coding Submission</h3>
+                                <p className="text-sm text-slate-600">
+                                  Language: {candidateCodingData.language || "N/A"}
+                                  {candidateCodingData.problem?.title && ` | Problem: ${candidateCodingData.problem.title}`}
+                                </p>
+                              </div>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                data-testid="admin-v2-eval-coding-copy"
+                                onClick={copyCandidateCodingToClipboard}
+                              >
+                                {candidateCodingCopied ? (
+                                  <>
+                                    <Check className="h-4 w-4 mr-2" />
+                                    Copied
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy className="h-4 w-4 mr-2" />
+                                    Copy
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+
+                            <Separator />
+
+                            {candidateCodingData.status === "loading" ? (
+                              <div className="text-sm text-slate-600" data-testid="admin-v2-eval-coding-loading">
+                                Loading coding submission...
+                              </div>
+                            ) : candidateCodingData.error ? (
+                              <div className="quest-error" data-testid="admin-v2-eval-coding-error">
+                                {extractErrorMessage(candidateCodingData.error)}
+                              </div>
+                            ) : (
+                              <>
+                                {candidateCodingData.problem && (
+                                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                                    <h4 className="font-semibold text-slate-900 mb-2">Problem Statement</h4>
+                                    <p className="text-sm text-slate-700 whitespace-pre-wrap">{candidateCodingData.problem.statement || "—"}</p>
+                                  </div>
+                                )}
+                                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                                  <h4 className="font-semibold text-slate-900 mb-2">Submitted Code</h4>
+                                  <pre className="text-sm font-mono overflow-x-auto whitespace-pre-wrap break-words max-h-[400px] overflow-y-auto" data-testid="admin-v2-eval-coding-content">
+                                    <code>{candidateCodingData.code || "No code available"}</code>
+                                  </pre>
+                                </div>
+                              </>
+                            )}
+                          </TabsContent>
+                        )}
+                      </Tabs>
+                    ) : null}
+                  </DialogContent>
+                </Dialog>
+
+                {/* <Dialog open={evaluationHistoryModalOpen} onOpenChange={(open) => {
+                  if (!open) {
+                    setEvaluationHistoryModalOpen(false);
+                    setSelectedCandidateForHistory(null);
+                  }
+                }}>
+                  <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto" data-testid="admin-v2-eval-history-dialog" onInteractOutside={(e) => e.preventDefault()}>
+                    <DialogHeader>
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <DialogTitle data-testid="admin-v2-eval-history-title">Evaluation History</DialogTitle>
+                          <DialogDescription data-testid="admin-v2-eval-history-desc">
+                            {selectedCandidateForHistory ? `Evaluation history for ${selectedCandidateForHistory.full_name}` : "Evaluation history"}
+                          </DialogDescription>
                         </div>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          data-testid="admin-v2-eval-history-close"
+                          onClick={() => {
+                            setEvaluationHistoryModalOpen(false);
+                            setSelectedCandidateForHistory(null);
+                          }}
+                        >
+                          Close
+                        </Button>
                       </div>
-                  </CardContent>
-                </Card>
-                ) : null}
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-end">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          data-testid="admin-v2-eval-history-refresh"
+                          onClick={() => loadCandidateScores(selectedCandidateForHistory?.candidate_id)}
+                        >
+                          Refresh
+                        </Button>
+                      </div>
+
+                      {scoresState.error ? <div className="quest-error">{extractErrorMessage(scoresState.error)}</div> : null}
+
+                      <div className="rounded-xl border border-slate-200/70 overflow-hidden">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Round</TableHead>
+                              <TableHead>Score</TableHead>
+                              <TableHead>Status</TableHead>
+                              <TableHead>Evaluated by</TableHead>
+                              <TableHead>Updated</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {scoresState.rows.map((s) => (
+                              <TableRow key={s.score_id}>
+                                <TableCell className="text-slate-900">{s.round_name}</TableCell>
+                                <TableCell>
+                                  <Badge variant="secondary">{s.score}</Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant="secondary">{s.status}</Badge>
+                                </TableCell>
+                                <TableCell className="text-slate-700">{s.evaluator_name || "—"}</TableCell>
+                                <TableCell className="text-slate-700">{formatDateTime(s.updated_at)}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+
+                      {scoresState.status === "loading" ? <div className="text-xs text-slate-500">Loading…</div> : null}
+                      {scoresState.rows.length === 0 && scoresState.status !== "loading" ? (
+                        <div className="text-xs text-slate-500">No evaluations yet.</div>
+                      ) : null}
+                    </div>
+                  </DialogContent>
+                </Dialog> */}
               </div>
             </TabsContent>
 
@@ -1862,7 +2396,7 @@ export default function AdminPanelV2() {
 
 
 
-                        <Separator />
+                    <Separator />
 
                     <div className="space-y-2" data-testid="admin-v2-quiz-correct-field">
                       <Label>Correct answer</Label>
@@ -1908,6 +2442,97 @@ export default function AdminPanelV2() {
             </TabsContent>
 
             <TabsContent value="coding" className="mt-6" data-testid="admin-v2-coding-tab">
+              {codingHistoryVisible && (
+                <Card className="quest-card" data-testid="admin-v2-coding-history-card">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle data-testid="admin-v2-coding-history-title">Assignment History</CardTitle>
+                        <CardDescription data-testid="admin-v2-coding-history-desc">
+                          History of coding problem assignments to candidates.
+                        </CardDescription>
+                      </div>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        data-testid="admin-v2-coding-history-hide"
+                        onClick={() => setCodingHistoryVisible(false)}
+                      >
+                        Hide
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {codingHistoryState.status === "loading" ? (
+                      <div className="text-sm text-slate-600" data-testid="admin-v2-coding-history-loading">Loading…</div>
+                    ) : codingHistoryState.error ? (
+                      <div className="quest-error" data-testid="admin-v2-coding-history-error">{extractErrorMessage(codingHistoryState.error)}</div>
+                    ) : codingHistoryState.rows.length === 0 ? (
+                      <div className="text-sm text-slate-600" data-testid="admin-v2-coding-history-empty">No assignment history found.</div>
+                    ) : (
+                      <div className="rounded-xl border border-slate-200/70 overflow-hidden">
+                        <div className="overflow-x-auto">
+                          <Table data-testid="admin-v2-coding-history-table">
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead data-testid="admin-v2-coding-history-th-candidate">Candidate</TableHead>
+                                <TableHead data-testid="admin-v2-coding-history-th-email">Email</TableHead>
+                                <TableHead data-testid="admin-v2-coding-history-th-round">Current Round</TableHead>
+                                <TableHead data-testid="admin-v2-coding-history-th-problem">Problem Title</TableHead>
+                                <TableHead data-testid="admin-v2-coding-history-th-difficulty">Difficulty</TableHead>
+                                {/* <TableHead data-testid="admin-v2-coding-history-th-status">Status</TableHead>
+                                  <TableHead data-testid="admin-v2-coding-history-th-assigned">Assigned At</TableHead> */}
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {codingHistoryState.rows.map((item, idx) => (
+                                <TableRow key={idx} data-testid={`admin-v2-coding-history-row-${idx}`}>
+                                  <TableCell data-testid={`admin-v2-coding-history-cell-candidate-${idx}`}>
+                                    {item.full_name || item.candidate_name || item.name || "—"}
+                                  </TableCell>
+                                  <TableCell data-testid={`admin-v2-coding-history-cell-email-${idx}`}>
+                                    {item.email || item.candidate_email || "—"}
+                                  </TableCell>
+                                  <TableCell data-testid={`admin-v2-coding-history-cell-round-${idx}`}>
+                                    {item.current_round || "—"}
+                                  </TableCell>
+                                  <TableCell data-testid={`admin-v2-coding-history-cell-problem-${idx}`}>
+                                    {item.problem_title || item.title || "—"}
+                                  </TableCell>
+                                  <TableCell data-testid={`admin-v2-coding-history-cell-difficulty-${idx}`}>
+                                    {item.problem_difficulty ? (
+                                      <Badge variant="secondary" data-testid={`admin-v2-coding-history-badge-difficulty-${idx}`}>
+                                        {item.problem_difficulty}
+                                      </Badge>
+                                    ) : (
+                                      "—"
+                                    )}
+                                  </TableCell>
+                                  {/* <TableCell data-testid={`admin-v2-coding-history-cell-status-${idx}`}>
+                                      {item.status ? (
+                                        <Badge 
+                                          variant={item.status === "Completed" || item.status === "Passed" ? "default" : "secondary"}
+                                          data-testid={`admin-v2-coding-history-badge-status-${idx}`}
+                                        >
+                                          {item.status}
+                                        </Badge>
+                                      ) : (
+                                        "—"
+                                      )}
+                                    </TableCell>
+                                    <TableCell data-testid={`admin-v2-coding-history-cell-assigned-${idx}`} className="text-xs text-slate-500">
+                                      {item.assigned_at ? formatDateTime(item.assigned_at) : "—"}
+                                    </TableCell> */}
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6" data-testid="admin-v2-coding-grid">
                 <Card className="quest-card" data-testid="admin-v2-coding-problems-card">
                   <CardHeader className="space-y-2">
@@ -1934,22 +2559,21 @@ export default function AdminPanelV2() {
 
                   <CardContent className="space-y-4" data-testid="admin-v2-coding-content">
                     <div className="space-y-2" data-testid="admin-v2-coding-template">
-                      <Label>Template</Label>
-                      <Select value={codingDraft.template_id} onValueChange={(v) => setCodingDraft((s) => ({ ...s, template_id: v }))}>
-                        <SelectTrigger data-testid="admin-v2-coding-template-select">
-                          <SelectValue placeholder="Select template" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {codingState.templates.map((t) => (
-                            <SelectItem key={t.template_id} value={t.template_id} data-testid={`admin-v2-coding-template-${t.template_id}`}>
+                      <Label>Templates</Label>
+                      <ul className="list-disc pl-5 space-y-1 text-sm text-slate-800" data-testid="admin-v2-coding-template-list">
+                        {codingState.templates.length === 0 ? (
+                          <li className="text-slate-500" data-testid="admin-v2-coding-template-empty">No templates available</li>
+                        ) : (
+                          codingState.templates.map((t) => (
+                            <li key={t.template_id} data-testid={`admin-v2-coding-template-${t.template_id}`}>
                               {t.title}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                            </li>
+                          ))
+                        )}
+                      </ul>
                     </div>
 
-                    <div className="space-y-2" data-testid="admin-v2-coding-title-override">
+                    {/* <div className="space-y-2" data-testid="admin-v2-coding-title-override">
                       <Label>Title override (optional)</Label>
                       <Input
                         value={codingDraft.title_override}
@@ -1957,15 +2581,38 @@ export default function AdminPanelV2() {
                         onChange={(e) => setCodingDraft((s) => ({ ...s, title_override: e.target.value }))}
                         placeholder="E.g., Two Sum (Pixwik)"
                       />
-                    </div>
+                    </div> */}
 
-                    <Button className="quest-primary" data-testid="admin-v2-coding-create" onClick={createCodingProblem}>
-                      Create coding problem
-                    </Button>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        className="quest-primary"
+                        data-testid="admin-v2-coding-create"
+                        onClick={assignRandomCodingProblem}
+                        disabled={codingState.status === "loading"}
+                      >
+                        {codingState.status === "loading" ? "Assigning…" : "Assign coding problem"}
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        data-testid="admin-v2-coding-revoke"
+                        onClick={revokeAllCodingAssignments}
+                        disabled={codingState.status === "loading"}
+                      >
+                        {codingState.status === "loading" ? "Revoking…" : "Revoke all assignments"}
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        data-testid="admin-v2-coding-history"
+                        onClick={toggleCodingHistory}
+                        disabled={codingState.status === "loading"}
+                      >
+                        History
+                      </Button>
+                    </div>
 
                     <Separator />
 
-                    <div className="space-y-2" data-testid="admin-v2-coding-problem-select">
+                    {/* <div className="space-y-2" data-testid="admin-v2-coding-problem-select">
                       <Label>Existing coding problems</Label>
                       <Select value={codingState.selectedProblemId} onValueChange={(v) => setCodingState((s) => ({ ...s, selectedProblemId: v }))}>
                         <SelectTrigger data-testid="admin-v2-coding-problem-dropdown">
@@ -1982,7 +2629,7 @@ export default function AdminPanelV2() {
                       <div className="text-xs text-slate-500" data-testid="admin-v2-coding-note">
                         Pick a problem then assign it to a round on the right.
                       </div>
-                    </div>
+                    </div> */}
                   </CardContent>
                 </Card>
 
@@ -2017,11 +2664,246 @@ export default function AdminPanelV2() {
                     ))}
                   </CardContent>
                 </Card>
+
+
               </div>
+
+              <div className="mt-6" data-testid="admin-v2-submission-history-section">
+                <Card className="quest-card">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle data-testid="admin-v2-submission-history-title">Submission History</CardTitle>
+                        <CardDescription data-testid="admin-v2-submission-history-desc">
+                          View all coding submissions
+                        </CardDescription>
+                      </div>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        data-testid="admin-v2-submission-history-refresh"
+                        onClick={loadSubmissionHistory}
+                      >
+                        Refresh
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {submissionHistory.status === "loading" ? (
+                      <div className="text-sm text-slate-600" data-testid="admin-v2-submission-history-loading">
+                        Loading…
+                      </div>
+                    ) : null}
+
+                    {submissionHistory.error ? (
+                      <div className="quest-error" data-testid="admin-v2-submission-history-error">
+                        {extractErrorMessage(submissionHistory.error)}
+                      </div>
+                    ) : null}
+
+                    {submissionHistory.status === "ready" && submissionHistory.rows.length > 0 ? (
+                      <div className="rounded-xl border border-slate-200/70 overflow-hidden">
+                        <Table data-testid="admin-v2-submission-history-table">
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Candidate</TableHead>
+                              <TableHead>Email</TableHead>
+                              <TableHead>Problem</TableHead>
+                              <TableHead>Language</TableHead>
+                              <TableHead>Status</TableHead>
+                              <TableHead>Submitted At</TableHead>
+                              <TableHead className="text-right">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {submissionHistory.rows.map((row) => (
+                              <TableRow key={row.submission_id || row.id} data-testid={`admin-v2-submission-history-row-${row.submission_id || row.id}`}>
+                                <TableCell className="text-slate-900">{row.candidate_name || row.full_name || "—"}</TableCell>
+                                <TableCell className="text-slate-700">{row.email || "—"}</TableCell>
+                                <TableCell className="text-slate-700">{row.problem_title || "—"}</TableCell>
+                                <TableCell>
+                                  <Badge variant="secondary">{row.language || "—"}</Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant="secondary">{row.status || "—"}</Badge>
+                                </TableCell>
+                                <TableCell className="text-slate-700">{row.submitted_at ? formatDateTime(row.submitted_at) : "—"}</TableCell>
+                                <TableCell className="text-right">
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    data-testid={`admin-v2-submission-history-show-code-${row.submission_id || row.id}`}
+                                    onClick={() => openCodeViewer(row.code || row.submitted_code, row.language)}
+                                  >
+                                    Show Code
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    ) : submissionHistory.status === "ready" && submissionHistory.rows.length === 0 ? (
+                      <div className="text-sm text-slate-600" data-testid="admin-v2-submission-history-empty">
+                        No submissions found.
+                      </div>
+                    ) : null}
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Dialog open={codeViewerOpen} onOpenChange={setCodeViewerOpen}>
+                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto" data-testid="admin-v2-code-viewer-dialog">
+                  <DialogHeader>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <DialogTitle data-testid="admin-v2-code-viewer-title">Submitted Code</DialogTitle>
+                        <DialogDescription data-testid="admin-v2-code-viewer-desc">
+                          Language: {selectedSubmissionLanguage || "N/A"}
+                        </DialogDescription>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          data-testid="admin-v2-code-viewer-copy"
+                          onClick={copyToClipboard}
+                        >
+                          {copied ? (
+                            <>
+                              <Check className="h-4 w-4 mr-2" />
+                              Copied
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="h-4 w-4 mr-2" />
+                              Copy
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          data-testid="admin-v2-code-viewer-close"
+                          onClick={() => setCodeViewerOpen(false)}
+                        >
+                          Close
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogHeader>
+                  <div className="mt-4">
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                      <pre className="text-sm font-mono overflow-x-auto whitespace-pre-wrap break-words" data-testid="admin-v2-code-viewer-content">
+                        <code>{selectedSubmissionCode || "No code available"}</code>
+                      </pre>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+
+              <Dialog open={candidateCodingViewerOpen} onOpenChange={setCandidateCodingViewerOpen}>
+                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto" data-testid="admin-v2-candidate-coding-viewer-dialog">
+                  <DialogHeader>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <DialogTitle data-testid="admin-v2-candidate-coding-viewer-title">Candidate Coding Submission</DialogTitle>
+                        <DialogDescription data-testid="admin-v2-candidate-coding-viewer-desc">
+                          Language: {candidateCodingData.language || "N/A"}
+                          {candidateCodingData.problem?.title && ` | Problem: ${candidateCodingData.problem.title}`}
+                        </DialogDescription>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          data-testid="admin-v2-candidate-coding-viewer-copy"
+                          onClick={copyCandidateCodingToClipboard}
+                        >
+                          {candidateCodingCopied ? (
+                            <>
+                              <Check className="h-4 w-4 mr-2" />
+                              Copied
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="h-4 w-4 mr-2" />
+                              Copy
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          variant="default"
+                          size="sm"
+                          data-testid="admin-v2-candidate-coding-viewer-run"
+                          onClick={runCandidateCoding}
+                          disabled={candidateCodingRunState.status === "loading" || !candidateCodingData.code}
+                        >
+                          <Play className="h-4 w-4 mr-2" />
+                          {candidateCodingRunState.status === "loading" ? "Running..." : "Run Code"}
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          data-testid="admin-v2-candidate-coding-viewer-close"
+                          onClick={() => setCandidateCodingViewerOpen(false)}
+                        >
+                          Close
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogHeader>
+                  <div className="mt-4 space-y-4">
+                    {candidateCodingData.status === "loading" ? (
+                      <div className="text-sm text-slate-600" data-testid="admin-v2-candidate-coding-viewer-loading">
+                        Loading...
+                      </div>
+                    ) : candidateCodingData.error ? (
+                      <div className="quest-error" data-testid="admin-v2-candidate-coding-viewer-error">
+                        {extractErrorMessage(candidateCodingData.error)}
+                      </div>
+                    ) : (
+                      <>
+                        {candidateCodingData.problem && (
+                          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                            <h4 className="font-semibold text-slate-900 mb-2">Problem Statement</h4>
+                            <p className="text-sm text-slate-700 whitespace-pre-wrap">{candidateCodingData.problem.statement || "—"}</p>
+                          </div>
+                        )}
+                        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                          <h4 className="font-semibold text-slate-900 mb-2">Submitted Code</h4>
+                          <pre className="text-sm font-mono overflow-x-auto whitespace-pre-wrap break-words" data-testid="admin-v2-candidate-coding-viewer-content">
+                            <code>{candidateCodingData.code || "No code available"}</code>
+                          </pre>
+                        </div>
+                        {candidateCodingRunState.status === "loading" ? (
+                          <div className="text-sm text-slate-600" data-testid="admin-v2-candidate-coding-viewer-run-loading">
+                            Running code...
+                          </div>
+                        ) : candidateCodingRunState.error ? (
+                          <div className="quest-error" data-testid="admin-v2-candidate-coding-viewer-run-error">
+                            {extractErrorMessage(candidateCodingRunState.error)}
+                          </div>
+                        ) : candidateCodingRunState.result ? (
+                          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4" data-testid="admin-v2-candidate-coding-viewer-run-result">
+                            <h4 className="font-semibold text-slate-900 mb-2">Run Result</h4>
+                            <div className="text-sm text-slate-700">
+                              <p>Passed: {candidateCodingRunState.result.passed || 0} / {candidateCodingRunState.result.total || 0}</p>
+                              {candidateCodingRunState.result.output && (
+                                <pre className="mt-2 whitespace-pre-wrap">{candidateCodingRunState.result.output}</pre>
+                              )}
+                            </div>
+                          </div>
+                        ) : null}
+                      </>
+                    )}
+                  </div>
+                </DialogContent>
+              </Dialog>
             </TabsContent>
 
             <TabsContent value="applications" className="mt-6" data-testid="admin-v2-apps-tab">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6" data-testid="admin-v2-apps-grid">
+              <div className="grid-cols-1 lg:grid-cols-2 gap-6" data-testid="admin-v2-apps-grid">
                 <Card className="quest-card" data-testid="admin-v2-apps-list-card">
                   <CardHeader className="space-y-2">
                     <div className="flex items-center justify-between gap-3">
@@ -2102,105 +2984,105 @@ export default function AdminPanelV2() {
                                 )}
                               </TableCell>
 
-            <TabsContent value="audit" className="mt-6" data-testid="admin-v2-audit-tab">
-              <Card className="quest-card" data-testid="admin-v2-audit-card">
-                <CardHeader className="space-y-2">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <CardTitle data-testid="admin-v2-audit-title">Audit logs</CardTitle>
-                      <CardDescription data-testid="admin-v2-audit-desc">Track admin and candidate actions.</CardDescription>
-                    </div>
-                    <Button variant="secondary" data-testid="admin-v2-audit-refresh" onClick={loadAuditLogs}>
-                      Refresh
-                    </Button>
-                  </div>
+                              <TabsContent value="audit" className="mt-6" data-testid="admin-v2-audit-tab">
+                                <Card className="quest-card" data-testid="admin-v2-audit-card">
+                                  <CardHeader className="space-y-2">
+                                    <div className="flex items-start justify-between gap-3">
+                                      <div>
+                                        <CardTitle data-testid="admin-v2-audit-title">Audit logs</CardTitle>
+                                        <CardDescription data-testid="admin-v2-audit-desc">Track admin and candidate actions.</CardDescription>
+                                      </div>
+                                      <Button variant="secondary" data-testid="admin-v2-audit-refresh" onClick={loadAuditLogs}>
+                                        Refresh
+                                      </Button>
+                                    </div>
 
-                  {auditState.error ? <div className="quest-error">{extractErrorMessage(auditState.error)}</div> : null}
+                                    {auditState.error ? <div className="quest-error">{extractErrorMessage(auditState.error)}</div> : null}
 
-                  <div className="flex flex-wrap items-center gap-2" data-testid="admin-v2-audit-filters">
-                    <div className="min-w-[260px]">
-                      <Select value={auditFilters.action} onValueChange={(v) => setAuditFilters((s) => ({ ...s, action: v }))}>
-                        <SelectTrigger data-testid="admin-v2-audit-action-trigger">
-                          <SelectValue placeholder="Filter by action" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All actions</SelectItem>
-                          <SelectItem value="candidate.promote">candidate.promote</SelectItem>
-                          <SelectItem value="candidate.reject">candidate.reject</SelectItem>
-                          <SelectItem value="candidate.finalize">candidate.finalize</SelectItem>
-                          <SelectItem value="candidate.score">candidate.score</SelectItem>
-                          <SelectItem value="candidate.bulk_promote">candidate.bulk_promote</SelectItem>
-                          <SelectItem value="candidate.bulk_reject">candidate.bulk_reject</SelectItem>
-                          <SelectItem value="candidate.bulk_finalize">candidate.bulk_finalize</SelectItem>
-                          <SelectItem value="candidate.bulk_delete">candidate.bulk_delete</SelectItem>
-                          <SelectItem value="admin.create_sub_admin">admin.create_sub_admin</SelectItem>
-                          <SelectItem value="admin.disable_sub_admin">admin.disable_sub_admin</SelectItem>
-                          <SelectItem value="admin.delete_sub_admin">admin.delete_sub_admin</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                                    <div className="flex flex-wrap items-center gap-2" data-testid="admin-v2-audit-filters">
+                                      <div className="min-w-[260px]">
+                                        <Select value={auditFilters.action} onValueChange={(v) => setAuditFilters((s) => ({ ...s, action: v }))}>
+                                          <SelectTrigger data-testid="admin-v2-audit-action-trigger">
+                                            <SelectValue placeholder="Filter by action" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="all">All actions</SelectItem>
+                                            <SelectItem value="candidate.promote">candidate.promote</SelectItem>
+                                            <SelectItem value="candidate.reject">candidate.reject</SelectItem>
+                                            <SelectItem value="candidate.finalize">candidate.finalize</SelectItem>
+                                            <SelectItem value="candidate.score">candidate.score</SelectItem>
+                                            <SelectItem value="candidate.bulk_promote">candidate.bulk_promote</SelectItem>
+                                            <SelectItem value="candidate.bulk_reject">candidate.bulk_reject</SelectItem>
+                                            <SelectItem value="candidate.bulk_finalize">candidate.bulk_finalize</SelectItem>
+                                            <SelectItem value="candidate.bulk_delete">candidate.bulk_delete</SelectItem>
+                                            <SelectItem value="admin.create_sub_admin">admin.create_sub_admin</SelectItem>
+                                            <SelectItem value="admin.disable_sub_admin">admin.disable_sub_admin</SelectItem>
+                                            <SelectItem value="admin.delete_sub_admin">admin.delete_sub_admin</SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
 
-                    <div className="min-w-[260px]">
-                      <Select value={auditFilters.job_slug} onValueChange={(v) => setAuditFilters((s) => ({ ...s, job_slug: v }))}>
-                        <SelectTrigger data-testid="admin-v2-audit-job-trigger">
-                          <SelectValue placeholder="Filter by job" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All jobs</SelectItem>
-                          {jobsState.rows
-                            .filter((j) => j.slug)
-                            .map((j) => (
-                              <SelectItem key={j.id} value={j.slug}>
-                                {j.title}
-                              </SelectItem>
-                            ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                                      <div className="min-w-[260px]">
+                                        <Select value={auditFilters.job_slug} onValueChange={(v) => setAuditFilters((s) => ({ ...s, job_slug: v }))}>
+                                          <SelectTrigger data-testid="admin-v2-audit-job-trigger">
+                                            <SelectValue placeholder="Filter by job" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="all">All jobs</SelectItem>
+                                            {jobsState.rows
+                                              .filter((j) => j.slug)
+                                              .map((j) => (
+                                                <SelectItem key={j.id} value={j.slug}>
+                                                  {j.title}
+                                                </SelectItem>
+                                              ))}
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
 
-                    <Button variant="secondary" data-testid="admin-v2-audit-apply" onClick={loadAuditLogs}>
-                      Apply
-                    </Button>
-                  </div>
-                </CardHeader>
+                                      <Button variant="secondary" data-testid="admin-v2-audit-apply" onClick={loadAuditLogs}>
+                                        Apply
+                                      </Button>
+                                    </div>
+                                  </CardHeader>
 
-                <CardContent>
-                  <div className="rounded-xl border border-slate-200/70 overflow-hidden">
-                    <Table data-testid="admin-v2-audit-table">
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>At</TableHead>
-                          <TableHead>Action</TableHead>
-                          <TableHead>Actor</TableHead>
-                          <TableHead>Role</TableHead>
-                          <TableHead>Candidate</TableHead>
-                          <TableHead>Job</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {auditState.rows.map((r) => (
-                          <TableRow key={r.log_id} data-testid={`admin-v2-audit-row-${r.log_id}`}>
-                            <TableCell className="text-slate-700">{formatDateTime(r.at)}</TableCell>
-                            <TableCell className="font-mono text-xs text-slate-900">{r.action}</TableCell>
-                            <TableCell className="text-slate-900">{r.actor}</TableCell>
-                            <TableCell>
-                              <Badge variant="secondary">{r.actor_role}</Badge>
-                            </TableCell>
-                            <TableCell className="font-mono text-xs text-slate-700">{r.candidate_id || "—"}</TableCell>
-                            <TableCell className="text-slate-700">{r.job_slug || "—"}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
+                                  <CardContent>
+                                    <div className="rounded-xl border border-slate-200/70 overflow-hidden">
+                                      <Table data-testid="admin-v2-audit-table">
+                                        <TableHeader>
+                                          <TableRow>
+                                            <TableHead>At</TableHead>
+                                            <TableHead>Action</TableHead>
+                                            <TableHead>Actor</TableHead>
+                                            <TableHead>Role</TableHead>
+                                            <TableHead>Candidate</TableHead>
+                                            <TableHead>Job</TableHead>
+                                          </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                          {auditState.rows.map((r) => (
+                                            <TableRow key={r.log_id} data-testid={`admin-v2-audit-row-${r.log_id}`}>
+                                              <TableCell className="text-slate-700">{formatDateTime(r.at)}</TableCell>
+                                              <TableCell className="font-mono text-xs text-slate-900">{r.action}</TableCell>
+                                              <TableCell className="text-slate-900">{r.actor}</TableCell>
+                                              <TableCell>
+                                                <Badge variant="secondary">{r.actor_role}</Badge>
+                                              </TableCell>
+                                              <TableCell className="font-mono text-xs text-slate-700">{r.candidate_id || "—"}</TableCell>
+                                              <TableCell className="text-slate-700">{r.job_slug || "—"}</TableCell>
+                                            </TableRow>
+                                          ))}
+                                        </TableBody>
+                                      </Table>
+                                    </div>
 
-                  {auditState.status === "loading" ? <div className="text-xs text-slate-500 mt-2">Loading…</div> : null}
-                  {auditState.rows.length === 0 && auditState.status !== "loading" ? (
-                    <div className="text-xs text-slate-500 mt-2">No logs yet.</div>
-                  ) : null}
-                </CardContent>
-              </Card>
-            </TabsContent>
+                                    {auditState.status === "loading" ? <div className="text-xs text-slate-500 mt-2">Loading…</div> : null}
+                                    {auditState.rows.length === 0 && auditState.status !== "loading" ? (
+                                      <div className="text-xs text-slate-500 mt-2">No logs yet.</div>
+                                    ) : null}
+                                  </CardContent>
+                                </Card>
+                              </TabsContent>
                               <TableCell data-testid={`admin-v2-app-cell-persona-${r.id}`}>
                                 <Badge variant="secondary" data-testid={`admin-v2-app-persona-${r.id}`}>
                                   {r.persona}
@@ -2232,19 +3114,15 @@ export default function AdminPanelV2() {
                   </CardContent>
                 </Card>
 
-                <Card className="quest-card" data-testid="admin-v2-app-details-card">
-                  <CardHeader>
-                    <CardTitle data-testid="admin-v2-app-details-title">Details</CardTitle>
-                    <CardDescription data-testid="admin-v2-app-details-desc">
-                      Open an application to view details and download resume.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {!selectedApplication ? (
-                      <div className="text-sm text-slate-600" data-testid="admin-v2-app-details-empty">
-                        Select an application from the list.
-                      </div>
-                    ) : (
+                <Dialog open={applicationDetailsOpen} onOpenChange={setApplicationDetailsOpen}>
+                  <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto" data-testid="admin-v2-app-details-dialog">
+                    <DialogHeader>
+                      <DialogTitle data-testid="admin-v2-app-details-title">Application Details</DialogTitle>
+                      <DialogDescription data-testid="admin-v2-app-details-desc">
+                        View application details and download resume.
+                      </DialogDescription>
+                    </DialogHeader>
+                    {selectedApplication ? (
                       <div className="space-y-4" data-testid="admin-v2-app-details">
                         <div className="flex flex-wrap items-center gap-2" data-testid="admin-v2-app-details-badges">
                           <Badge className="quest-badge" data-testid="admin-v2-app-details-persona">
@@ -2337,9 +3215,9 @@ export default function AdminPanelV2() {
                           </div>
                         </div>
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
+                    ) : null}
+                  </DialogContent>
+                </Dialog>
               </div>
             </TabsContent>
 

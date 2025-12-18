@@ -9,6 +9,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const TOKEN_KEY = "pixwik_candidate_token";
 
@@ -21,6 +28,24 @@ export default function CandidateQuiz() {
   const [state, setState] = useState({ status: "loading", error: null, round: null, items: [] });
   const [answers, setAnswers] = useState({});
   const [submitState, setSubmitState] = useState({ status: "idle", error: null });
+
+  // Mobile warning modal state
+  const [showMobileWarning, setShowMobileWarning] = useState(false);
+
+  // Check screen size and show warning on mobile
+  useEffect(() => {
+    const checkScreenSize = () => {
+      if (window.innerWidth < 1024) {
+        setShowMobileWarning(true);
+      } else {
+        setShowMobileWarning(false);
+      }
+    };
+    
+    checkScreenSize();
+    window.addEventListener("resize", checkScreenSize);
+    return () => window.removeEventListener("resize", checkScreenSize);
+  }, []);
 
   useEffect(() => {
     const onScroll = () => {
@@ -88,6 +113,37 @@ export default function CandidateQuiz() {
   return (
     <div className="quest-page" data-testid="candidate-quiz-page">
       <div className="quest-backdrop" aria-hidden="true" data-testid="candidate-quiz-backdrop" />
+
+      {showMobileWarning && (
+        <style>{`
+          [data-radix-dialog-overlay] {
+            background-color: rgb(0, 0, 0) !important;
+            opacity: 1 !important;
+          }
+        `}</style>
+      )}
+      <Dialog open={showMobileWarning} onOpenChange={(open) => {
+        // Prevent closing the modal on mobile - it should stay open
+        if (!open && window.innerWidth < 1024) {
+          setShowMobileWarning(true);
+        } else {
+          setShowMobileWarning(open);
+        }
+      }}>
+        <DialogContent className="max-w-md" data-testid="candidate-quiz-mobile-warning-dialog" onInteractOutside={(e) => e.preventDefault()}>
+          <DialogHeader>
+            <DialogTitle className="text-center" data-testid="candidate-quiz-mobile-warning-title">Desktop Required</DialogTitle>
+            <DialogDescription data-testid="candidate-quiz-mobile-warning-desc">
+              This screen is only for desktops. Please open this page on a desktop or laptop computer for the best experience.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-slate-600 text-center">
+              The quiz interface requires a larger screen to function properly.
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <a
         href="/"
