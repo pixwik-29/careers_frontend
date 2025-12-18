@@ -183,7 +183,7 @@ export default function AdminPanelV2() {
   const [codingDraft, setCodingDraft] = useState({ template_id: "", title_override: "" });
   const [codingHistoryVisible, setCodingHistoryVisible] = useState(false);
   const [codingHistoryState, setCodingHistoryState] = useState({ status: "idle", error: null, rows: [] });
-
+  
   // Submission history state
   const [submissionHistory, setSubmissionHistory] = useState({ status: "idle", error: null, rows: [] });
   const [codeViewerOpen, setCodeViewerOpen] = useState(false);
@@ -548,9 +548,9 @@ export default function AdminPanelV2() {
     try {
       await axios.post(`${API}/admin/candidates/${candidate.candidate_id}/promote`, {}, getAxiosConfig({ headers: { Authorization: `Bearer ${token}` } }));
       await loadCandidates();
-      toast({
-        title: "Candidate promoted",
-        description: `${candidate.full_name} has been promoted to the next round`
+      toast({ 
+        title: "Candidate promoted", 
+        description: `${candidate.full_name} has been promoted to the next round` 
       });
       setEvaluationModalOpen(false);
       setCandidatesState((s) => ({ ...s, selected: null }));
@@ -761,9 +761,9 @@ export default function AdminPanelV2() {
     try {
       await axios.post(`${API}/admin/candidates/${candidate.candidate_id}/reject`, {}, getAxiosConfig({ headers: { Authorization: `Bearer ${token}` } }));
       await loadCandidates();
-      toast({
-        title: "Candidate rejected",
-        description: `${candidate.full_name} has been rejected`
+      toast({ 
+        title: "Candidate rejected", 
+        description: `${candidate.full_name} has been rejected` 
       });
       setEvaluationModalOpen(false);
       setCandidatesState((s) => ({ ...s, selected: null }));
@@ -1142,7 +1142,7 @@ export default function AdminPanelV2() {
 
   async function openCoding(candidate) {
     if (!candidate?.candidate_id) return;
-
+    
     setEvalTab("coding");
     setCandidateCodingData({ status: "loading", error: null, code: "", language: "", problem: null });
     setCandidateCodingCopied(false);
@@ -1176,7 +1176,7 @@ export default function AdminPanelV2() {
     if (evalTab === "coding" && candidatesState.selected?.candidate_id && candidateCodingData.status !== "loading" && !candidateCodingData.code) {
       const candidate = candidatesState.selected;
       if (!candidate?.candidate_id) return;
-
+      
       setCandidateCodingData({ status: "loading", error: null, code: "", language: "", problem: null });
       setCandidateCodingCopied(false);
       setCandidateCodingRunState({ status: "idle", error: null, result: null });
@@ -1206,7 +1206,7 @@ export default function AdminPanelV2() {
 
   async function loadQuizSubmission(candidateId) {
     if (!candidateId) return;
-
+    
     setQuizSubmissionData({ status: "loading", error: null, data: null });
     try {
       const res = await axios.get(
@@ -1733,67 +1733,67 @@ export default function AdminPanelV2() {
                         </CardDescription>
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-2" data-testid="admin-v2-candidates-filters">
-                        <div className="min-w-[260px]" data-testid="admin-v2-candidates-job-filter">
-                          <Select value={candidateJobFilter} onValueChange={(v) => setCandidateJobFilter(v)}>
-                            <SelectTrigger data-testid="admin-v2-candidates-job-filter-trigger">
-                              <SelectValue placeholder="Filter by job" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="all">All jobs</SelectItem>
-                              {jobsState.rows
-                                .filter((j) => j.slug)
-                                .map((j) => (
-                                  <SelectItem key={j.id} value={j.slug}>
-                                    {j.title}
-                                  </SelectItem>
-                                ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div className="min-w-[200px]" data-testid="admin-v2-candidates-status-filter">
-                          <Select value={candidateStatusFilter} onValueChange={(v) => setCandidateStatusFilter(v)}>
-                            <SelectTrigger data-testid="admin-v2-candidates-status-filter-trigger">
-                              <SelectValue placeholder="Filter by status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="all">All statuses</SelectItem>
-                              <SelectItem value="Active">Active</SelectItem>
-                              <SelectItem value="Rejected">Rejected</SelectItem>
-                              <SelectItem value="Selected">Selected</SelectItem>
-                              <SelectItem value="Completed (not selected)">Completed (not selected)</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div className="min-w-[260px]" data-testid="admin-v2-candidates-round-filter">
-                          <Select value={candidateRoundFilter} onValueChange={(v) => setCandidateRoundFilter(v)}>
-                            <SelectTrigger data-testid="admin-v2-candidates-round-filter-trigger">
-                              <SelectValue placeholder="Filter by round" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="all">All rounds</SelectItem>
-                              {roundsState.rows.map((r) => (
-                                <SelectItem key={r.round_id} value={r.round_name}>
-                                  {r.round_name}
+                    <div className="flex flex-wrap items-center gap-2" data-testid="admin-v2-candidates-filters">
+                      <div className="min-w-[260px]" data-testid="admin-v2-candidates-job-filter">
+                        <Select value={candidateJobFilter} onValueChange={(v) => setCandidateJobFilter(v)}>
+                          <SelectTrigger data-testid="admin-v2-candidates-job-filter-trigger">
+                            <SelectValue placeholder="Filter by job" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All jobs</SelectItem>
+                            {jobsState.rows
+                              .filter((j) => j.slug)
+                              .map((j) => (
+                                <SelectItem key={j.id} value={j.slug}>
+                                  {j.title}
                                 </SelectItem>
                               ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <Button
-                          variant="secondary"
-                          data-testid="admin-v2-candidates-apply-filter"
-                          onClick={() => {
-                            setSelectedCandidateIds([]);
-                            loadCandidates();
-                          }}
-                        >
-                          Apply
-                        </Button>
+                          </SelectContent>
+                        </Select>
                       </div>
+
+                      <div className="min-w-[200px]" data-testid="admin-v2-candidates-status-filter">
+                        <Select value={candidateStatusFilter} onValueChange={(v) => setCandidateStatusFilter(v)}>
+                          <SelectTrigger data-testid="admin-v2-candidates-status-filter-trigger">
+                            <SelectValue placeholder="Filter by status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All statuses</SelectItem>
+                            <SelectItem value="Active">Active</SelectItem>
+                            <SelectItem value="Rejected">Rejected</SelectItem>
+                            <SelectItem value="Selected">Selected</SelectItem>
+                            <SelectItem value="Completed (not selected)">Completed (not selected)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="min-w-[260px]" data-testid="admin-v2-candidates-round-filter">
+                        <Select value={candidateRoundFilter} onValueChange={(v) => setCandidateRoundFilter(v)}>
+                          <SelectTrigger data-testid="admin-v2-candidates-round-filter-trigger">
+                            <SelectValue placeholder="Filter by round" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All rounds</SelectItem>
+                            {roundsState.rows.map((r) => (
+                              <SelectItem key={r.round_id} value={r.round_name}>
+                                {r.round_name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <Button
+                        variant="secondary"
+                        data-testid="admin-v2-candidates-apply-filter"
+                        onClick={() => {
+                          setSelectedCandidateIds([]);
+                          loadCandidates();
+                        }}
+                      >
+                        Apply
+                      </Button>
+                    </div>
 
                       <div className="flex items-center gap-2" data-testid="admin-v2-candidates-actions">
                         {selectedCandidateIds.length > 0 ? (
@@ -2012,109 +2012,109 @@ export default function AdminPanelV2() {
                           <Separator />
 
 
-                          <div className="space-y-2" data-testid="admin-v2-eval-score">
-                            <Label>Score</Label>
-                            <Input
-                              type="number"
-                              value={evalForm.score}
-                              data-testid="admin-v2-eval-score-input"
-                              onChange={(e) => setEvalForm((s) => ({ ...s, score: e.target.value }))}
-                              placeholder="0"
-                            />
-                            <div className="text-xs text-slate-500" data-testid="admin-v2-eval-max">
-                              Max score depends on the round (R1=20, R2=30, R3=30, R4=20). Round names are: Communication & Creativity, Problem-solving, Technical collaboration, Attitude & Culture fit.
-                            </div>
+                        <div className="space-y-2" data-testid="admin-v2-eval-score">
+                          <Label>Score</Label>
+                          <Input
+                            type="number"
+                            value={evalForm.score}
+                            data-testid="admin-v2-eval-score-input"
+                            onChange={(e) => setEvalForm((s) => ({ ...s, score: e.target.value }))}
+                            placeholder="0"
+                          />
+                          <div className="text-xs text-slate-500" data-testid="admin-v2-eval-max">
+                            Max score depends on the round (R1=20, R2=30, R3=30, R4=20). Round names are: Communication & Creativity, Problem-solving, Technical collaboration, Attitude & Culture fit.
+                          </div>
 
-                            <div className="space-y-2">
-                              {quizSubmissionData.status === "loading" ? (
-                                <div className="text-xs text-slate-500">Loading quiz data...</div>
-                              ) : quizSubmissionData.error ? (
-                                <div className="text-xs text-red-600">{extractErrorMessage(quizSubmissionData.error)}</div>
-                              ) : quizSubmissionData.data ? (
-                                <div className="flex flex-wrap items-center gap-2">
+                          <div className="space-y-2">
+                            {quizSubmissionData.status === "loading" ? (
+                              <div className="text-xs text-slate-500">Loading quiz data...</div>
+                            ) : quizSubmissionData.error ? (
+                              <div className="text-xs text-red-600">{extractErrorMessage(quizSubmissionData.error)}</div>
+                            ) : quizSubmissionData.data ? (
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Badge variant="secondary">
+                                  Questions: {quizSubmissionData.data.selected_answers ? Object.keys(quizSubmissionData.data.selected_answers).length : 0}
+                                </Badge>
+                                <Badge variant="secondary">
+                                  Score: {quizSubmissionData.data.score || 0}
+                                </Badge>
+                                <Badge 
+                                  variant="default"
+                                  className={quizSubmissionData.data.status === "Pass" ? "bg-green-500 hover:bg-green-600 text-white" : "bg-red-500 hover:bg-red-600 text-white"}
+                                >
+                                  Status: {quizSubmissionData.data.status || "N/A"}
+                                </Badge>
+                                {quizSubmissionData.data.comment && (
                                   <Badge variant="secondary">
-                                    Questions: {quizSubmissionData.data.selected_answers ? Object.keys(quizSubmissionData.data.selected_answers).length : 0}
+                                    Comment: {quizSubmissionData.data.comment}
                                   </Badge>
-                                  <Badge variant="secondary">
-                                    Score: {quizSubmissionData.data.score || 0}
-                                  </Badge>
-                                  <Badge
-                                    variant="default"
-                                    className={quizSubmissionData.data.status === "Pass" ? "bg-green-500 hover:bg-green-600 text-white" : "bg-red-500 hover:bg-red-600 text-white"}
-                                  >
-                                    Status: {quizSubmissionData.data.status || "N/A"}
-                                  </Badge>
-                                  {quizSubmissionData.data.comment && (
-                                    <Badge variant="secondary">
-                                      Comment: {quizSubmissionData.data.comment}
-                                    </Badge>
-                                  )}
-                                </div>
-                              ) : (
-                                <Badge variant="secondary">Quiz Not Completed</Badge>
-                              )}
-                            </div>
+                                )}
+                              </div>
+                            ) : (
+                              <Badge variant="secondary">Quiz Not Completed</Badge>
+                            )}
                           </div>
+                        </div>
 
-                          <div className="space-y-2" data-testid="admin-v2-eval-evaluator">
-                            <Label>Evaluator name</Label>
-                            <Input
-                              value={evalForm.evaluator_name}
-                              data-testid="admin-v2-eval-evaluator-input"
-                              onChange={(e) => setEvalForm((s) => ({ ...s, evaluator_name: e.target.value }))}
-                              placeholder="Your name"
-                            />
-                          </div>
+                        <div className="space-y-2" data-testid="admin-v2-eval-evaluator">
+                          <Label>Evaluator name</Label>
+                          <Input
+                            value={evalForm.evaluator_name}
+                            data-testid="admin-v2-eval-evaluator-input"
+                            onChange={(e) => setEvalForm((s) => ({ ...s, evaluator_name: e.target.value }))}
+                            placeholder="Your name"
+                          />
+                        </div>
 
-                          <div className="space-y-2" data-testid="admin-v2-eval-comments">
-                            <Label>Comments</Label>
-                            <Textarea
-                              value={evalForm.comments}
-                              data-testid="admin-v2-eval-comments-input"
-                              onChange={(e) => setEvalForm((s) => ({ ...s, comments: e.target.value }))}
-                              className="min-h-[110px]"
-                              placeholder="Notes for internal review"
-                            />
-                          </div>
+                        <div className="space-y-2" data-testid="admin-v2-eval-comments">
+                          <Label>Comments</Label>
+                          <Textarea
+                            value={evalForm.comments}
+                            data-testid="admin-v2-eval-comments-input"
+                            onChange={(e) => setEvalForm((s) => ({ ...s, comments: e.target.value }))}
+                            className="min-h-[110px]"
+                            placeholder="Notes for internal review"
+                          />
+                        </div>
 
-                          <div className="space-y-2" data-testid="admin-v2-eval-status">
-                            <Label>Result</Label>
-                            <Select value={evalForm.status} onValueChange={(v) => setEvalForm((s) => ({ ...s, status: v }))}>
-                              <SelectTrigger data-testid="admin-v2-eval-status-select">
-                                <SelectValue placeholder="Select result" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="Pass" data-testid="admin-v2-eval-pass">Pass</SelectItem>
-                                <SelectItem value="Fail" data-testid="admin-v2-eval-fail">Fail</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
+                        <div className="space-y-2" data-testid="admin-v2-eval-status">
+                          <Label>Result</Label>
+                          <Select value={evalForm.status} onValueChange={(v) => setEvalForm((s) => ({ ...s, status: v }))}>
+                            <SelectTrigger data-testid="admin-v2-eval-status-select">
+                              <SelectValue placeholder="Select result" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Pass" data-testid="admin-v2-eval-pass">Pass</SelectItem>
+                              <SelectItem value="Fail" data-testid="admin-v2-eval-fail">Fail</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
 
-                          <div className="flex flex-wrap items-center gap-2" data-testid="admin-v2-eval-actions">
-                            <Button className="quest-primary" data-testid="admin-v2-eval-submit" onClick={submitEvaluation}>
-                              Submit score
-                            </Button>
+                        <div className="flex flex-wrap items-center gap-2" data-testid="admin-v2-eval-actions">
+                          <Button className="quest-primary" data-testid="admin-v2-eval-submit" onClick={submitEvaluation}>
+                            Submit score
+                          </Button>
 
-                            <Button variant="secondary" data-testid="admin-v2-eval-promote" onClick={promoteCandidate}>
-                              Promote to Next Round
-                            </Button>
+                          <Button variant="secondary" data-testid="admin-v2-eval-promote" onClick={promoteCandidate}>
+                            Promote to Next Round
+                          </Button>
 
-                            <Button variant="secondary" data-testid="admin-v2-eval-reject" onClick={rejectCandidate}>
-                              Reject
-                            </Button>
+                          <Button variant="secondary" data-testid="admin-v2-eval-reject" onClick={rejectCandidate}>
+                            Reject
+                          </Button>
 
-                            <Button variant="secondary" data-testid="admin-v2-eval-final-select" onClick={() => finalizeCandidate("Selected")}>
-                              Mark Selected
-                            </Button>
+                          <Button variant="secondary" data-testid="admin-v2-eval-final-select" onClick={() => finalizeCandidate("Selected")}>
+                            Mark Selected
+                          </Button>
 
-                            <Button variant="secondary" data-testid="admin-v2-eval-final-deselect" onClick={() => finalizeCandidate("Completed")}>
-                              De-select (Completed)
-                            </Button>
-                          </div>
+                          <Button variant="secondary" data-testid="admin-v2-eval-final-deselect" onClick={() => finalizeCandidate("Completed")}>
+                            De-select (Completed)
+                          </Button>
+                        </div>
 
-                          <div className="text-xs text-slate-500" data-testid="admin-v2-eval-email-note">
-                            Promotion/rejection emails are sent automatically.
-                          </div>
+                        <div className="text-xs text-slate-500" data-testid="admin-v2-eval-email-note">
+                          Promotion/rejection emails are sent automatically.
+                        </div>
                         </TabsContent>
 
                         {candidatesState.selected?.is_coding && (
@@ -2396,7 +2396,7 @@ export default function AdminPanelV2() {
 
 
 
-                    <Separator />
+                        <Separator />
 
                     <div className="space-y-2" data-testid="admin-v2-quiz-correct-field">
                       <Label>Correct answer</Label>
@@ -2442,73 +2442,73 @@ export default function AdminPanelV2() {
             </TabsContent>
 
             <TabsContent value="coding" className="mt-6" data-testid="admin-v2-coding-tab">
-              {codingHistoryVisible && (
-                <Card className="quest-card" data-testid="admin-v2-coding-history-card">
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle data-testid="admin-v2-coding-history-title">Assignment History</CardTitle>
-                        <CardDescription data-testid="admin-v2-coding-history-desc">
-                          History of coding problem assignments to candidates.
-                        </CardDescription>
+            {codingHistoryVisible && (
+                  <Card className="quest-card" data-testid="admin-v2-coding-history-card">
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <CardTitle data-testid="admin-v2-coding-history-title">Assignment History</CardTitle>
+                          <CardDescription data-testid="admin-v2-coding-history-desc">
+                            History of coding problem assignments to candidates.
+                          </CardDescription>
+                        </div>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          data-testid="admin-v2-coding-history-hide"
+                          onClick={() => setCodingHistoryVisible(false)}
+                        >
+                          Hide
+                        </Button>
                       </div>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        data-testid="admin-v2-coding-history-hide"
-                        onClick={() => setCodingHistoryVisible(false)}
-                      >
-                        Hide
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    {codingHistoryState.status === "loading" ? (
-                      <div className="text-sm text-slate-600" data-testid="admin-v2-coding-history-loading">Loading…</div>
-                    ) : codingHistoryState.error ? (
-                      <div className="quest-error" data-testid="admin-v2-coding-history-error">{extractErrorMessage(codingHistoryState.error)}</div>
-                    ) : codingHistoryState.rows.length === 0 ? (
-                      <div className="text-sm text-slate-600" data-testid="admin-v2-coding-history-empty">No assignment history found.</div>
-                    ) : (
-                      <div className="rounded-xl border border-slate-200/70 overflow-hidden">
-                        <div className="overflow-x-auto">
-                          <Table data-testid="admin-v2-coding-history-table">
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead data-testid="admin-v2-coding-history-th-candidate">Candidate</TableHead>
-                                <TableHead data-testid="admin-v2-coding-history-th-email">Email</TableHead>
-                                <TableHead data-testid="admin-v2-coding-history-th-round">Current Round</TableHead>
-                                <TableHead data-testid="admin-v2-coding-history-th-problem">Problem Title</TableHead>
-                                <TableHead data-testid="admin-v2-coding-history-th-difficulty">Difficulty</TableHead>
-                                {/* <TableHead data-testid="admin-v2-coding-history-th-status">Status</TableHead>
+                    </CardHeader>
+                    <CardContent>
+                      {codingHistoryState.status === "loading" ? (
+                        <div className="text-sm text-slate-600" data-testid="admin-v2-coding-history-loading">Loading…</div>
+                      ) : codingHistoryState.error ? (
+                        <div className="quest-error" data-testid="admin-v2-coding-history-error">{extractErrorMessage(codingHistoryState.error)}</div>
+                      ) : codingHistoryState.rows.length === 0 ? (
+                        <div className="text-sm text-slate-600" data-testid="admin-v2-coding-history-empty">No assignment history found.</div>
+                      ) : (
+                        <div className="rounded-xl border border-slate-200/70 overflow-hidden">
+                          <div className="overflow-x-auto">
+                            <Table data-testid="admin-v2-coding-history-table">
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead data-testid="admin-v2-coding-history-th-candidate">Candidate</TableHead>
+                                  <TableHead data-testid="admin-v2-coding-history-th-email">Email</TableHead>
+                                  <TableHead data-testid="admin-v2-coding-history-th-round">Current Round</TableHead>
+                                  <TableHead data-testid="admin-v2-coding-history-th-problem">Problem Title</TableHead>
+                                  <TableHead data-testid="admin-v2-coding-history-th-difficulty">Difficulty</TableHead>
+                                  {/* <TableHead data-testid="admin-v2-coding-history-th-status">Status</TableHead>
                                   <TableHead data-testid="admin-v2-coding-history-th-assigned">Assigned At</TableHead> */}
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {codingHistoryState.rows.map((item, idx) => (
-                                <TableRow key={idx} data-testid={`admin-v2-coding-history-row-${idx}`}>
-                                  <TableCell data-testid={`admin-v2-coding-history-cell-candidate-${idx}`}>
-                                    {item.full_name || item.candidate_name || item.name || "—"}
-                                  </TableCell>
-                                  <TableCell data-testid={`admin-v2-coding-history-cell-email-${idx}`}>
-                                    {item.email || item.candidate_email || "—"}
-                                  </TableCell>
-                                  <TableCell data-testid={`admin-v2-coding-history-cell-round-${idx}`}>
-                                    {item.current_round || "—"}
-                                  </TableCell>
-                                  <TableCell data-testid={`admin-v2-coding-history-cell-problem-${idx}`}>
-                                    {item.problem_title || item.title || "—"}
-                                  </TableCell>
-                                  <TableCell data-testid={`admin-v2-coding-history-cell-difficulty-${idx}`}>
-                                    {item.problem_difficulty ? (
-                                      <Badge variant="secondary" data-testid={`admin-v2-coding-history-badge-difficulty-${idx}`}>
-                                        {item.problem_difficulty}
-                                      </Badge>
-                                    ) : (
-                                      "—"
-                                    )}
-                                  </TableCell>
-                                  {/* <TableCell data-testid={`admin-v2-coding-history-cell-status-${idx}`}>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {codingHistoryState.rows.map((item, idx) => (
+                                  <TableRow key={idx} data-testid={`admin-v2-coding-history-row-${idx}`}>
+                                    <TableCell data-testid={`admin-v2-coding-history-cell-candidate-${idx}`}>
+                                      {item.full_name || item.candidate_name || item.name || "—"}
+                                    </TableCell>
+                                    <TableCell data-testid={`admin-v2-coding-history-cell-email-${idx}`}>
+                                      {item.email || item.candidate_email || "—"}
+                                    </TableCell>
+                                    <TableCell data-testid={`admin-v2-coding-history-cell-round-${idx}`}>
+                                      {item.current_round || "—"}
+                                    </TableCell>
+                                    <TableCell data-testid={`admin-v2-coding-history-cell-problem-${idx}`}>
+                                      {item.problem_title || item.title || "—"}
+                                    </TableCell>
+                                    <TableCell data-testid={`admin-v2-coding-history-cell-difficulty-${idx}`}>
+                                      {item.problem_difficulty ? (
+                                        <Badge variant="secondary" data-testid={`admin-v2-coding-history-badge-difficulty-${idx}`}>
+                                          {item.problem_difficulty}
+                                        </Badge>
+                                      ) : (
+                                        "—"
+                                      )}
+                                    </TableCell>
+                                    {/* <TableCell data-testid={`admin-v2-coding-history-cell-status-${idx}`}>
                                       {item.status ? (
                                         <Badge 
                                           variant={item.status === "Completed" || item.status === "Passed" ? "default" : "secondary"}
@@ -2523,16 +2523,16 @@ export default function AdminPanelV2() {
                                     <TableCell data-testid={`admin-v2-coding-history-cell-assigned-${idx}`} className="text-xs text-slate-500">
                                       {item.assigned_at ? formatDateTime(item.assigned_at) : "—"}
                                     </TableCell> */}
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
                         </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6" data-testid="admin-v2-coding-grid">
                 <Card className="quest-card" data-testid="admin-v2-coding-problems-card">
                   <CardHeader className="space-y-2">
@@ -2584,25 +2584,25 @@ export default function AdminPanelV2() {
                     </div> */}
 
                     <div className="flex flex-wrap items-center gap-2">
-                      <Button
-                        className="quest-primary"
-                        data-testid="admin-v2-coding-create"
+                      <Button 
+                        className="quest-primary" 
+                        data-testid="admin-v2-coding-create" 
                         onClick={assignRandomCodingProblem}
                         disabled={codingState.status === "loading"}
                       >
                         {codingState.status === "loading" ? "Assigning…" : "Assign coding problem"}
                       </Button>
-                      <Button
-                        variant="secondary"
-                        data-testid="admin-v2-coding-revoke"
+                      <Button 
+                        variant="secondary" 
+                        data-testid="admin-v2-coding-revoke" 
                         onClick={revokeAllCodingAssignments}
                         disabled={codingState.status === "loading"}
                       >
                         {codingState.status === "loading" ? "Revoking…" : "Revoke all assignments"}
                       </Button>
-                      <Button
-                        variant="secondary"
-                        data-testid="admin-v2-coding-history"
+                      <Button 
+                        variant="secondary" 
+                        data-testid="admin-v2-coding-history" 
                         onClick={toggleCodingHistory}
                         disabled={codingState.status === "loading"}
                       >
@@ -2665,9 +2665,9 @@ export default function AdminPanelV2() {
                   </CardContent>
                 </Card>
 
-
+              
               </div>
-
+              
               <div className="mt-6" data-testid="admin-v2-submission-history-section">
                 <Card className="quest-card">
                   <CardHeader>
@@ -2984,105 +2984,105 @@ export default function AdminPanelV2() {
                                 )}
                               </TableCell>
 
-                              <TabsContent value="audit" className="mt-6" data-testid="admin-v2-audit-tab">
-                                <Card className="quest-card" data-testid="admin-v2-audit-card">
-                                  <CardHeader className="space-y-2">
-                                    <div className="flex items-start justify-between gap-3">
-                                      <div>
-                                        <CardTitle data-testid="admin-v2-audit-title">Audit logs</CardTitle>
-                                        <CardDescription data-testid="admin-v2-audit-desc">Track admin and candidate actions.</CardDescription>
-                                      </div>
-                                      <Button variant="secondary" data-testid="admin-v2-audit-refresh" onClick={loadAuditLogs}>
-                                        Refresh
-                                      </Button>
-                                    </div>
+            <TabsContent value="audit" className="mt-6" data-testid="admin-v2-audit-tab">
+              <Card className="quest-card" data-testid="admin-v2-audit-card">
+                <CardHeader className="space-y-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <CardTitle data-testid="admin-v2-audit-title">Audit logs</CardTitle>
+                      <CardDescription data-testid="admin-v2-audit-desc">Track admin and candidate actions.</CardDescription>
+                    </div>
+                    <Button variant="secondary" data-testid="admin-v2-audit-refresh" onClick={loadAuditLogs}>
+                      Refresh
+                    </Button>
+                  </div>
 
-                                    {auditState.error ? <div className="quest-error">{extractErrorMessage(auditState.error)}</div> : null}
+                  {auditState.error ? <div className="quest-error">{extractErrorMessage(auditState.error)}</div> : null}
 
-                                    <div className="flex flex-wrap items-center gap-2" data-testid="admin-v2-audit-filters">
-                                      <div className="min-w-[260px]">
-                                        <Select value={auditFilters.action} onValueChange={(v) => setAuditFilters((s) => ({ ...s, action: v }))}>
-                                          <SelectTrigger data-testid="admin-v2-audit-action-trigger">
-                                            <SelectValue placeholder="Filter by action" />
-                                          </SelectTrigger>
-                                          <SelectContent>
-                                            <SelectItem value="all">All actions</SelectItem>
-                                            <SelectItem value="candidate.promote">candidate.promote</SelectItem>
-                                            <SelectItem value="candidate.reject">candidate.reject</SelectItem>
-                                            <SelectItem value="candidate.finalize">candidate.finalize</SelectItem>
-                                            <SelectItem value="candidate.score">candidate.score</SelectItem>
-                                            <SelectItem value="candidate.bulk_promote">candidate.bulk_promote</SelectItem>
-                                            <SelectItem value="candidate.bulk_reject">candidate.bulk_reject</SelectItem>
-                                            <SelectItem value="candidate.bulk_finalize">candidate.bulk_finalize</SelectItem>
-                                            <SelectItem value="candidate.bulk_delete">candidate.bulk_delete</SelectItem>
-                                            <SelectItem value="admin.create_sub_admin">admin.create_sub_admin</SelectItem>
-                                            <SelectItem value="admin.disable_sub_admin">admin.disable_sub_admin</SelectItem>
-                                            <SelectItem value="admin.delete_sub_admin">admin.delete_sub_admin</SelectItem>
-                                          </SelectContent>
-                                        </Select>
-                                      </div>
+                  <div className="flex flex-wrap items-center gap-2" data-testid="admin-v2-audit-filters">
+                    <div className="min-w-[260px]">
+                      <Select value={auditFilters.action} onValueChange={(v) => setAuditFilters((s) => ({ ...s, action: v }))}>
+                        <SelectTrigger data-testid="admin-v2-audit-action-trigger">
+                          <SelectValue placeholder="Filter by action" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All actions</SelectItem>
+                          <SelectItem value="candidate.promote">candidate.promote</SelectItem>
+                          <SelectItem value="candidate.reject">candidate.reject</SelectItem>
+                          <SelectItem value="candidate.finalize">candidate.finalize</SelectItem>
+                          <SelectItem value="candidate.score">candidate.score</SelectItem>
+                          <SelectItem value="candidate.bulk_promote">candidate.bulk_promote</SelectItem>
+                          <SelectItem value="candidate.bulk_reject">candidate.bulk_reject</SelectItem>
+                          <SelectItem value="candidate.bulk_finalize">candidate.bulk_finalize</SelectItem>
+                          <SelectItem value="candidate.bulk_delete">candidate.bulk_delete</SelectItem>
+                          <SelectItem value="admin.create_sub_admin">admin.create_sub_admin</SelectItem>
+                          <SelectItem value="admin.disable_sub_admin">admin.disable_sub_admin</SelectItem>
+                          <SelectItem value="admin.delete_sub_admin">admin.delete_sub_admin</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-                                      <div className="min-w-[260px]">
-                                        <Select value={auditFilters.job_slug} onValueChange={(v) => setAuditFilters((s) => ({ ...s, job_slug: v }))}>
-                                          <SelectTrigger data-testid="admin-v2-audit-job-trigger">
-                                            <SelectValue placeholder="Filter by job" />
-                                          </SelectTrigger>
-                                          <SelectContent>
-                                            <SelectItem value="all">All jobs</SelectItem>
-                                            {jobsState.rows
-                                              .filter((j) => j.slug)
-                                              .map((j) => (
-                                                <SelectItem key={j.id} value={j.slug}>
-                                                  {j.title}
-                                                </SelectItem>
-                                              ))}
-                                          </SelectContent>
-                                        </Select>
-                                      </div>
+                    <div className="min-w-[260px]">
+                      <Select value={auditFilters.job_slug} onValueChange={(v) => setAuditFilters((s) => ({ ...s, job_slug: v }))}>
+                        <SelectTrigger data-testid="admin-v2-audit-job-trigger">
+                          <SelectValue placeholder="Filter by job" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All jobs</SelectItem>
+                          {jobsState.rows
+                            .filter((j) => j.slug)
+                            .map((j) => (
+                              <SelectItem key={j.id} value={j.slug}>
+                                {j.title}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-                                      <Button variant="secondary" data-testid="admin-v2-audit-apply" onClick={loadAuditLogs}>
-                                        Apply
-                                      </Button>
-                                    </div>
-                                  </CardHeader>
+                    <Button variant="secondary" data-testid="admin-v2-audit-apply" onClick={loadAuditLogs}>
+                      Apply
+                    </Button>
+                  </div>
+                </CardHeader>
 
-                                  <CardContent>
-                                    <div className="rounded-xl border border-slate-200/70 overflow-hidden">
-                                      <Table data-testid="admin-v2-audit-table">
-                                        <TableHeader>
-                                          <TableRow>
-                                            <TableHead>At</TableHead>
-                                            <TableHead>Action</TableHead>
-                                            <TableHead>Actor</TableHead>
-                                            <TableHead>Role</TableHead>
-                                            <TableHead>Candidate</TableHead>
-                                            <TableHead>Job</TableHead>
-                                          </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                          {auditState.rows.map((r) => (
-                                            <TableRow key={r.log_id} data-testid={`admin-v2-audit-row-${r.log_id}`}>
-                                              <TableCell className="text-slate-700">{formatDateTime(r.at)}</TableCell>
-                                              <TableCell className="font-mono text-xs text-slate-900">{r.action}</TableCell>
-                                              <TableCell className="text-slate-900">{r.actor}</TableCell>
-                                              <TableCell>
-                                                <Badge variant="secondary">{r.actor_role}</Badge>
-                                              </TableCell>
-                                              <TableCell className="font-mono text-xs text-slate-700">{r.candidate_id || "—"}</TableCell>
-                                              <TableCell className="text-slate-700">{r.job_slug || "—"}</TableCell>
-                                            </TableRow>
-                                          ))}
-                                        </TableBody>
-                                      </Table>
-                                    </div>
+                <CardContent>
+                  <div className="rounded-xl border border-slate-200/70 overflow-hidden">
+                    <Table data-testid="admin-v2-audit-table">
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>At</TableHead>
+                          <TableHead>Action</TableHead>
+                          <TableHead>Actor</TableHead>
+                          <TableHead>Role</TableHead>
+                          <TableHead>Candidate</TableHead>
+                          <TableHead>Job</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {auditState.rows.map((r) => (
+                          <TableRow key={r.log_id} data-testid={`admin-v2-audit-row-${r.log_id}`}>
+                            <TableCell className="text-slate-700">{formatDateTime(r.at)}</TableCell>
+                            <TableCell className="font-mono text-xs text-slate-900">{r.action}</TableCell>
+                            <TableCell className="text-slate-900">{r.actor}</TableCell>
+                            <TableCell>
+                              <Badge variant="secondary">{r.actor_role}</Badge>
+                            </TableCell>
+                            <TableCell className="font-mono text-xs text-slate-700">{r.candidate_id || "—"}</TableCell>
+                            <TableCell className="text-slate-700">{r.job_slug || "—"}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
 
-                                    {auditState.status === "loading" ? <div className="text-xs text-slate-500 mt-2">Loading…</div> : null}
-                                    {auditState.rows.length === 0 && auditState.status !== "loading" ? (
-                                      <div className="text-xs text-slate-500 mt-2">No logs yet.</div>
-                                    ) : null}
-                                  </CardContent>
-                                </Card>
-                              </TabsContent>
+                  {auditState.status === "loading" ? <div className="text-xs text-slate-500 mt-2">Loading…</div> : null}
+                  {auditState.rows.length === 0 && auditState.status !== "loading" ? (
+                    <div className="text-xs text-slate-500 mt-2">No logs yet.</div>
+                  ) : null}
+                </CardContent>
+              </Card>
+            </TabsContent>
                               <TableCell data-testid={`admin-v2-app-cell-persona-${r.id}`}>
                                 <Badge variant="secondary" data-testid={`admin-v2-app-persona-${r.id}`}>
                                   {r.persona}
